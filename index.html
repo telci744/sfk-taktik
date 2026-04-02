@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sydhan - Merkezi Giriş</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b131a; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #ecf0f1; overflow: hidden; }
+        .bg-watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 20vw; font-weight: 900; color: rgba(255, 255, 255, 0.02); z-index: 0; pointer-events: none; letter-spacing: 10px; }
+
+        .auth-container { background: linear-gradient(145deg, #16222d, #121c25); border: 1px solid #d4af37; border-radius: 15px; padding: 40px; width: 90%; max-width: 400px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); position: relative; z-index: 1; text-align: center; }
+        .header-title { margin-bottom: 30px; }
+        .header-title h1 { font-size: 32px; color: #d4af37; margin: 0; text-transform: uppercase; letter-spacing: 6px; }
+        .header-title p { color: #bdc3c7; font-size: 13px; margin-top: 5px; letter-spacing: 1px; }
+
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; font-size: 12px; font-weight: bold; color: #bdc3c7; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        .input-group input { width: 100%; padding: 12px; background-color: #0b131a; border: 1px solid #2c3e50; border-radius: 5px; color: white; font-size: 15px; transition: 0.3s; }
+        .input-group input:focus { outline: none; border-color: #d4af37; }
+
+        .btn-main { background-color: #d4af37; color: #0b131a; border: none; padding: 15px; width: 100%; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; transition: 0.3s; }
+        .btn-main:hover { background-color: #f1c40f; }
+
+        .toggle-link { margin-top: 20px; display: block; color: #bdc3c7; font-size: 13px; cursor: pointer; text-decoration: underline; transition: 0.2s; }
+        .toggle-link:hover { color: #d4af37; }
+
+        #registerForm { display: none; }
+        .msg { font-size: 13px; margin-top: 15px; font-weight: bold; display: none; padding: 10px; border-radius: 5px; }
+        .msg.error { color: #fff; background-color: #e74c3c; } 
+        .msg.success { color: #fff; background-color: #27ae60; }
+        .msg.info { color: #000; background-color: #f1c40f; }
+    </style>
+</head>
+<body>
+
+    <div class="bg-watermark">SYDHAN</div>
+
+    <div class="auth-container">
+        <div id="loginForm">
+            <div class="header-title">
+                <h1>SYDHAN</h1>
+                <p>Premium OSM Analiz Merkezi</p>
+            </div>
+            <div class="input-group"><label>OSM Nick</label><input type="text" id="loginId" placeholder="Nickinizi girin" autocomplete="off"></div>
+            <div class="input-group"><label>Şifre</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="off"></div>
+            
+            <button type="button" class="btn-main" onclick="login()">Giriş Yap</button>
+            <div id="loginMsg" class="msg"></div>
+            <span class="toggle-link" onclick="toggleForms()">Sisteme Başvur (Şifre Belirle)</span>
+        </div>
+
+        <div id="registerForm">
+            <div class="header-title">
+                <h1>SYDHAN</h1>
+                <p>Yeni Kullanıcı Başvurusu</p>
+            </div>
+            <div class="input-group"><label>Ad Soyad</label><input type="text" id="regName" placeholder="Örn: Ahmet Yılmaz" autocomplete="off"></div>
+            <div class="input-group"><label>OSM Nick</label><input type="text" id="regNick" placeholder="Oyundaki adınız" autocomplete="off"></div>
+            <div class="input-group"><label>Kullanmak İstediğiniz Şifre</label><input type="password" id="regPass" placeholder="Şifre belirleyin" autocomplete="off"></div>
+            
+            <button type="button" class="btn-main" onclick="register()">Başvuruyu Gönder</button>
+            <div id="regMsg" class="msg"></div>
+            <span class="toggle-link" onclick="toggleForms()">Zaten onaylı mısınız? Giriş Yapın</span>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_zEbZek8IyacdHojnBpb4cWTIvBSdOtk",
+            authDomain: "sfk-taktik.firebaseapp.com",
+            projectId: "sfk-taktik",
+            storageBucket: "sfk-taktik.firebasestorage.app",
+            messagingSenderId: "773612917206",
+            appId: "1:773612917206:web:6c21289cc1fc179c5a9477"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        function toggleForms() {
+            const loginF = document.getElementById('loginForm');
+            const regF = document.getElementById('registerForm');
+            loginF.style.display = loginF.style.display === 'none' ? 'block' : 'none';
+            regF.style.display = regF.style.display === 'block' ? 'none' : 'block';
+            document.getElementById('loginMsg').style.display = 'none';
+            document.getElementById('regMsg').style.display = 'none';
+        }
+
+        function showMessage(elementId, text, type) {
+            const el = document.getElementById(elementId);
+            el.innerText = text; el.className = 'msg ' + type; el.style.display = 'block';
+        }
+
+        function register() {
+            try {
+                const name = document.getElementById('regName').value;
+                const nick = document.getElementById('regNick').value;
+                const pass = document.getElementById('regPass').value;
+
+                if(!name || !nick || !pass) { showMessage('regMsg', 'HATA: Lütfen tüm alanları doldurun!', 'error'); return; }
+
+                showMessage('regMsg', 'Sisteme bağlanılıyor, lütfen bekleyin...', 'info');
+
+                db.collection("users").add({
+                    adSoyad: name, osmNick: nick, sifre: pass, rol: "kullanici", durum: "onay_bekliyor", kayitTarihi: Date.now()
+                }).then(() => {
+                    showMessage('regMsg', 'BAŞARILI: Başvuru alındı! Yöneticinin onayını bekleyin.', 'success');
+                    document.getElementById('regName').value = ''; 
+                    document.getElementById('regNick').value = '';
+                    document.getElementById('regPass').value = '';
+                }).catch((err) => {
+                    showMessage('regMsg', 'HATA: ' + err.message, 'error');
+                });
+            } catch (error) { alert("Sistemsel Hata: " + error.message); }
+        }
+
+        function login() {
+            const loginId = document.getElementById('loginId').value;
+            const loginPass = document.getElementById('loginPass').value;
+
+            if(!loginPass) { showMessage('loginMsg', 'Lütfen şifre girin.', 'error'); return; }
+
+            // YÖNETİCİ GİZLİ GİRİŞİ
+            if(loginPass === "3428") {
+                localStorage.setItem("sfk_kullanici", "Yönetici (Reis)");
+                localStorage.setItem("sfk_rol", "admin");
+                window.location.href = "yonetim.html";
+                return;
+            }
+
+            if(!loginId) { showMessage('loginMsg', 'Nick girin.', 'error'); return; }
+            showMessage('loginMsg', 'Giriş yapılıyor...', 'info');
+
+            db.collection("users").where("osmNick", "==", loginId).get().then((snapshot) => {
+                if(snapshot.empty) { showMessage('loginMsg', 'Kullanıcı bulunamadı.', 'error'); return; }
+                let userData = null;
+                snapshot.forEach(doc => { userData = doc.data(); });
+
+                if(userData.sifre !== loginPass) { showMessage('loginMsg', 'Hatalı şifre.', 'error'); return; }
+                if(userData.durum === "onay_bekliyor") { showMessage('loginMsg', 'Hesabınız henüz onaylanmamış.', 'error'); return; }
+                if(userData.durum === "reddedildi") { showMessage('loginMsg', 'Hesabınız reddedilmiş.', 'error'); return; }
+
+                localStorage.setItem("sfk_kullanici", userData.osmNick);
+                localStorage.setItem("sfk_rol", "kullanici");
+                window.location.href = "taktik.html";
+            }).catch((err) => { showMessage('loginMsg', 'Hata: ' + err.message, 'error'); });
+        }
+
+        document.getElementById('loginPass').addEventListener('keypress', function(e) { if (e.key === 'Enter') login(); });
+    </script>
+</body>
+</html>
