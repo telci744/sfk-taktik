@@ -1,1 +1,166 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TAKTIX - Kozmik Oda</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
 
+    <style>
+        * { box-sizing: border-box; }
+        :root { --bg-dark: #0b131a; --container-bg: #121c25; --section-bg: #16222d; --gold-accent: #d4af37; --text-light: #ecf0f1; --border-color: #2c3e50; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-dark); margin: 0; padding-bottom: 60px; color: var(--text-light); min-height: 100vh; position: relative; }
+        
+        .header { background-color: var(--container-bg); padding: 25px 20px; text-align: center; border-bottom: 2px solid var(--gold-accent); position: relative; box-shadow: 0 10px 20px rgba(0,0,0,0.5); z-index: 10; }
+        .header h1 { margin: 0; color: var(--gold-accent); font-size: 28px; letter-spacing: 4px; text-transform: uppercase; }
+        .header p { margin: 5px 0 0 0; color: #e74c3c; font-size: 13px; font-weight: bold; letter-spacing: 1px;}
+
+        .btn-top { position: absolute; top: 25px; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.3s; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;}
+        .btn-logout { left: 20px; background: transparent; border: 1px solid #e74c3c; color: #e74c3c; }
+        .btn-logout:hover { background: #e74c3c; color: white; }
+
+        .container { max-width: 1200px; margin: 40px auto; padding: 0 20px; position: relative; }
+        .btn-back { display: none; background-color: transparent; color: var(--gold-accent); border: 1px solid var(--gold-accent); padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; transition: 0.3s; letter-spacing: 1px;}
+        .btn-back:hover { background-color: var(--gold-accent); color: var(--bg-dark); }
+
+        .view-section { display: none; animation: fadeIn 0.4s ease; } .active-view { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 3'LÜ PANEL SİSTEMİ İÇİN GRID GÜNCELLENDİ */
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 30px; }
+        .menu-panel { background: linear-gradient(145deg, var(--section-bg), var(--container-bg)); border: 1px solid var(--border-color); border-radius: 15px; padding: 40px 20px; text-align: center; cursor: pointer; transition: 0.4s ease; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        .menu-panel:hover { border-color: var(--gold-accent); transform: translateY(-5px); }
+        .menu-panel h2 { margin: 0; color: var(--text-light); font-size: 20px; text-transform: uppercase; letter-spacing: 2px; }
+        .menu-panel:hover h2 { color: var(--gold-accent); }
+        .menu-panel p { color: #bdc3c7; margin-top: 15px; font-size: 13px; }
+
+        .panel { background: linear-gradient(145deg, var(--section-bg), var(--container-bg)); border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; overflow-x: auto; }
+        .panel h2 { margin-top: 0; color: var(--text-light); font-size: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; letter-spacing: 1px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 14px; white-space: nowrap; }
+        th, td { text-align: center; padding: 15px 10px; border-bottom: 1px solid var(--border-color); }
+        th { color: var(--gold-accent); font-weight: bold; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; }
+        tr:hover { background-color: var(--bg-dark); }
+        
+        .status { padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+        .status.bekliyor { background-color: #f39c12; color: #fff; }
+        .status.onayli { background-color: #27ae60; color: #fff; }
+        .status.reddedildi { background-color: #c0392b; color: #fff; }
+        .pass-box { background-color: #000; color: #f1c40f; padding: 4px 8px; border-radius: 4px; font-family: monospace; }
+        .action-btn { border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; margin: 2px; transition: 0.2s; color: white; text-transform: uppercase; letter-spacing: 1px;}
+        .btn-approve { background-color: #27ae60; } .btn-reject { background-color: #e67e22; } .btn-delete { background-color: #c0392b; }
+
+        /* SYDHAN İMZASI */
+        .sydhan-footer { position: absolute; bottom: 15px; left: 0; width: 100%; text-align: center; color: rgba(255,255,255,0.15); font-size: 10px; letter-spacing: 4px; text-transform: uppercase; font-weight: bold; z-index: 0; }
+
+        @media (max-width: 768px) { .btn-top { position: static; display: inline-block; margin: 10px 5px; } .header { padding-bottom: 15px; } .dashboard-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <script>if(localStorage.getItem("sfk_rol") !== "admin") window.location.href = "index.html";</script>
+
+    <div class="header">
+        <button class="btn-top btn-logout" onclick="cikisYap()">🚪 Çıkış</button>
+        <h1>👑 TAKTIX KOZMİK ODA</h1>
+        <p>Yalnızca Kurucu Tarafından Görüntülenebilir</p>
+    </div>
+
+    <div class="container">
+        <button class="btn-back" id="backBtn" onclick="showDashboard()">◀ Panellere Dön</button>
+
+        <div id="dashboardView" class="view-section active-view">
+            <div class="dashboard-grid">
+                <div class="menu-panel" onclick="showUserManagement()">
+                    <h2>👤 Kullanıcı Yönetimi</h2>
+                    <p>Sisteme kayıt olanları onayla, reddet veya sil.</p>
+                </div>
+                <div class="menu-panel" onclick="showTacticsManagement()">
+                    <h2>📋 Taktik Yönetimi</h2>
+                    <p>Sistemdeki tüm taktikleri görüntüle ve hatalı olanları sil.</p>
+                </div>
+                <div class="menu-panel" onclick="window.location.href='taktik.html'">
+                    <h2>⚔️ Savaş Odasına Dön</h2>
+                    <p>Taktix sistemine ve radara geçiş yap.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="userManagementView" class="view-section">
+            <div class="panel">
+                <h2>Onay Bekleyenler ve Tüm Kullanıcılar</h2>
+                <table>
+                    <thead><tr><th>Ad Soyad</th><th>OSM Nick</th><th>Şifre</th><th>Durum</th><th>İşlemler</th></tr></thead>
+                    <tbody id="userList"><tr><td colspan="5" style="color:#bdc3c7;">Veriler yükleniyor...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tacticsManagementView" class="view-section">
+            <div class="panel">
+                <h2>Sistemdeki Tüm Taktikler</h2>
+                <table>
+                    <thead><tr><th>Raporlayan</th><th>Rakip</th><th>Bizim Taktik</th><th>Sonuç</th><th>Oy</th><th>İşlem</th></tr></thead>
+                    <tbody id="adminTacticList"><tr><td colspan="6" style="color:#bdc3c7;">Veriler yükleniyor...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="sydhan-footer">POWERED BY SYDHAN</div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_zEbZek8IyacdHojnBpb4cWTIvBSdOtk",
+            authDomain: "sfk-taktik.firebaseapp.com",
+            projectId: "sfk-taktik",
+            storageBucket: "sfk-taktik.firebasestorage.app",
+            messagingSenderId: "773612917206",
+            appId: "1:773612917206:web:6c21289cc1fc179c5a9477"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        function cikisYap() { localStorage.removeItem("sfk_kullanici"); localStorage.removeItem("sfk_rol"); window.location.href = "index.html"; }
+
+        const dashboardView = document.getElementById('dashboardView');
+        const userManagementView = document.getElementById('userManagementView');
+        const tacticsManagementView = document.getElementById('tacticsManagementView');
+        const backBtn = document.getElementById('backBtn');
+
+        function hideAllViews() { dashboardView.classList.remove('active-view'); userManagementView.classList.remove('active-view'); tacticsManagementView.classList.remove('active-view'); }
+        function showDashboard() { hideAllViews(); dashboardView.classList.add('active-view'); backBtn.style.display = 'none'; }
+        function showUserManagement() { hideAllViews(); userManagementView.classList.add('active-view'); backBtn.style.display = 'inline-block'; }
+        function showTacticsManagement() { hideAllViews(); tacticsManagementView.classList.add('active-view'); backBtn.style.display = 'inline-block'; }
+
+        db.collection("users").orderBy("kayitTarihi", "desc").onSnapshot((snapshot) => {
+            const list = document.getElementById('userList'); list.innerHTML = '';
+            if(snapshot.empty) { list.innerHTML = '<tr><td colspan="5">Sistemde kayıtlı kullanıcı yok.</td></tr>'; return; }
+            snapshot.forEach((doc) => {
+                const user = doc.data(); const userId = doc.id;
+                let dClass = "bekliyor", dYazi = "Onay Bekliyor";
+                if(user.durum === "onaylandi") { dClass = "onayli"; dYazi = "Onaylandı"; }
+                if(user.durum === "reddedildi") { dClass = "reddedildi"; dYazi = "Reddedildi"; }
+
+                list.innerHTML += `<tr><td><strong style="color:var(--text-light)">${user.adSoyad}</strong></td><td><span style="color:var(--gold-accent)">${user.osmNick}</span></td><td><span class="pass-box">${user.sifre}</span></td><td><span class="status ${dClass}">${dYazi}</span></td><td>${user.durum !== 'onaylandi' ? `<button class="action-btn btn-approve" onclick="islemYap('${userId}', 'onaylandi')">✓ Onayla</button>` : ''}${user.durum !== 'reddedildi' ? `<button class="action-btn btn-reject" onclick="islemYap('${userId}', 'reddedildi')">✗ Reddet</button>` : ''}<button class="action-btn btn-delete" onclick="kullaniciSil('${userId}')">🗑️ Sil</button></td></tr>`;
+            });
+        });
+
+        function islemYap(id, durum) { db.collection("users").doc(id).update({durum: durum}); }
+        function kullaniciSil(id) { if(confirm("Emin misiniz?")) db.collection("users").doc(id).delete(); }
+
+        db.collection("tactics").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+            const list = document.getElementById('adminTacticList'); list.innerHTML = '';
+            if(snapshot.empty) { list.innerHTML = '<tr><td colspan="6">Sistemde henüz taktik yok.</td></tr>'; return; }
+            snapshot.forEach((doc) => {
+                const t = doc.data(); const tId = doc.id; const oySayisi = t.votedUsers ? t.votedUsers.length : 0;
+                list.innerHTML += `<tr><td><strong style="color:var(--gold-accent)">${t.menajer}</strong></td><td>${t.rakipTakim}</td><td>${t.bizimDizilis}</td><td>${t.sonuc}</td><td>🔥 ${oySayisi}</td><td><button class="action-btn btn-delete" onclick="taktikSil('${tId}')">🗑️ Sil</button></td></tr>`;
+            });
+        });
+
+        function taktikSil(id) { if(confirm("Bu taktiği sistemden tamamen silmek istediğinize emin misiniz?")) db.collection("tactics").doc(id).delete(); }
+    </script>
+</body>
+</html>
