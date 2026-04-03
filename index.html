@@ -2,77 +2,212 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TAKTIX - Merkezi Giriş</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TAKTIX - Strateji Merkezi</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
 
     <style>
-        * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b131a; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #ecf0f1; overflow: hidden; position: relative; }
-        .bg-watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 20vw; font-weight: 900; color: rgba(255, 255, 255, 0.02); z-index: 0; pointer-events: none; letter-spacing: 10px; }
+        /* Apple SF Pro Font & Base Reset */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f5f5f7; /* iOS Sistem Arkaplan Rengi */
+            margin: 0; 
+            padding: 0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            min-height: 100vh;
+            color: #1c1c1e;
+        }
 
-        .auth-container { background: linear-gradient(145deg, #16222d, #121c25); border: 1px solid #d4af37; border-radius: 15px; padding: 40px; width: 90%; max-width: 400px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); position: relative; z-index: 1; text-align: center; }
-        .header-title { margin-bottom: 30px; }
-        .header-title h1 { font-size: 32px; color: #d4af37; margin: 0; text-transform: uppercase; letter-spacing: 6px; }
-        .header-title p { color: #bdc3c7; font-size: 13px; margin-top: 5px; letter-spacing: 1px; }
+        /* Mobil Uygulama Çerçevesi */
+        .mobile-wrapper {
+            width: 100%;
+            max-width: 430px; /* iPhone Pro Max genişliği */
+            min-height: 100vh;
+            background-color: #f5f5f7;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 30px 25px;
+            overflow: hidden;
+        }
 
-        .input-group { margin-bottom: 20px; text-align: left; }
-        .input-group label { display: block; font-size: 12px; font-weight: bold; color: #bdc3c7; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
-        .input-group input { width: 100%; padding: 12px; background-color: #0b131a; border: 1px solid #2c3e50; border-radius: 5px; color: white; font-size: 15px; transition: 0.3s; }
-        .input-group input:focus { outline: none; border-color: #d4af37; }
+        /* Arkaplan Süslemeleri (Bulanık Yuvarlaklar) */
+        .bg-blob-1 { position: absolute; top: -10%; left: -20%; width: 300px; height: 300px; background: rgba(212, 175, 55, 0.15); border-radius: 50%; filter: blur(50px); z-index: 0; pointer-events: none; }
+        .bg-blob-2 { position: absolute; bottom: -10%; right: -20%; width: 250px; height: 250px; background: rgba(155, 89, 182, 0.1); border-radius: 50%; filter: blur(40px); z-index: 0; pointer-events: none; }
 
-        .btn-main { background-color: #d4af37; color: #0b131a; border: none; padding: 15px; width: 100%; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; transition: 0.3s; }
-        .btn-main:hover { background-color: #f1c40f; }
+        /* Logo Alanı */
+        .logo-container {
+            text-align: center;
+            margin-bottom: 40px;
+            z-index: 1;
+        }
+        .logo-container h1 {
+            font-size: 42px;
+            font-weight: 800;
+            color: #d4af37; /* TAKTIX Gold */
+            margin: 0;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            text-shadow: 0 2px 10px rgba(212, 175, 55, 0.2);
+        }
+        .logo-container p {
+            font-size: 11px;
+            font-weight: 600;
+            color: #8e8e93;
+            margin: 5px 0 0 0;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
 
-        .toggle-link { margin-top: 20px; display: block; color: #bdc3c7; font-size: 13px; cursor: pointer; text-decoration: underline; transition: 0.2s; }
-        .toggle-link:hover { color: #d4af37; }
+        /* Glassmorphism (Cam Efekti) Kart */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 35px 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            z-index: 1;
+            width: 100%;
+        }
+
+        /* Form Elemanları */
+        .input-group { margin-bottom: 18px; }
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #8e8e93;
+            margin-bottom: 8px;
+            margin-left: 4px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 16px;
+            background-color: #ffffff;
+            border: 1.5px solid #e5e5ea;
+            border-radius: 14px;
+            font-size: 15px;
+            color: #1c1c1e;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.01);
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #d4af37;
+            box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1);
+        }
+
+        /* Premium Buton */
+        .btn-main {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #d4af37 0%, #b58b22 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            margin-top: 10px;
+        }
+        .btn-main:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(212, 175, 55, 0.2); }
+
+        /* Yönlendirme Linki */
+        .toggle-link {
+            display: block;
+            text-align: center;
+            margin-top: 25px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #007aff; /* iOS Mavi */
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        /* Mesaj Kutuları */
+        .msg { font-size: 13px; margin-top: 15px; font-weight: 600; display: none; padding: 12px; border-radius: 10px; text-align: center; }
+        .msg.error { background-color: #ffe5e5; color: #d63031; border: 1px solid #ffcccc; } 
+        .msg.success { background-color: #e5f9e5; color: #27ae60; border: 1px solid #ccf2cc; }
+        .msg.info { background-color: #fff3cd; color: #f39c12; border: 1px solid #ffe69c; }
 
         #registerForm { display: none; }
-        .msg { font-size: 13px; margin-top: 15px; font-weight: bold; display: none; padding: 10px; border-radius: 5px; }
-        .msg.error { color: #fff; background-color: #e74c3c; } 
-        .msg.success { color: #fff; background-color: #27ae60; }
-        .msg.info { color: #000; background-color: #f1c40f; }
 
-        /* SYDHAN İMZASI */
-        .sydhan-footer { position: fixed; bottom: 15px; left: 0; width: 100%; text-align: center; color: rgba(255,255,255,0.15); font-size: 10px; letter-spacing: 4px; text-transform: uppercase; font-weight: bold; z-index: 0; }
+        /* Sydhan İmza */
+        .sydhan-footer {
+            position: absolute;
+            bottom: 25px;
+            width: 100%;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: #aeaeb2;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            z-index: 1;
+        }
+        .sydhan-footer span { color: #d4af37; }
     </style>
 </head>
 <body>
 
-    <div class="bg-watermark">TAKTIX</div>
+    <div class="mobile-wrapper">
+        <div class="bg-blob-1"></div>
+        <div class="bg-blob-2"></div>
 
-    <div class="auth-container">
-        <div id="loginForm">
-            <div class="header-title">
-                <h1>TAKTIX</h1>
-                <p>Premium OSM Analiz Merkezi</p>
-            </div>
-            <div class="input-group"><label>OSM Nick</label><input type="text" id="loginId" placeholder="Nickinizi girin" autocomplete="off"></div>
-            <div class="input-group"><label>Şifre</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="off"></div>
-            
-            <button type="button" class="btn-main" onclick="login()">Giriş Yap</button>
-            <div id="loginMsg" class="msg"></div>
-            <span class="toggle-link" onclick="toggleForms()">Sisteme Başvur (Şifre Belirle)</span>
+        <div class="logo-container">
+            <h1>TAKTIX</h1>
+            <p>Strategic System</p>
         </div>
 
-        <div id="registerForm">
-            <div class="header-title">
-                <h1>TAKTIX</h1>
-                <p>Yeni Kullanıcı Başvurusu</p>
+        <div class="glass-card">
+            <div id="loginForm">
+                <div class="input-group">
+                    <label>Kullanıcı Adı (OSM Nick)</label>
+                    <input type="text" id="loginId" placeholder="Analist adı girin" autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label>Güvenlik Şifresi</label>
+                    <input type="password" id="loginPass" placeholder="••••••••" autocomplete="off">
+                </div>
+                
+                <button type="button" class="btn-main" onclick="login()">SİSTEME GİRİŞ YAP</button>
+                <div id="loginMsg" class="msg"></div>
+                <span class="toggle-link" onclick="toggleForms()">Yetkiniz yok mu? Başvuru Yapın</span>
             </div>
-            <div class="input-group"><label>Ad Soyad</label><input type="text" id="regName" placeholder="Örn: Ahmet Yılmaz" autocomplete="off"></div>
-            <div class="input-group"><label>OSM Nick</label><input type="text" id="regNick" placeholder="Oyundaki adınız" autocomplete="off"></div>
-            <div class="input-group"><label>Kullanmak İstediğiniz Şifre</label><input type="password" id="regPass" placeholder="Şifre belirleyin" autocomplete="off"></div>
-            
-            <button type="button" class="btn-main" onclick="register()">Başvuruyu Gönder</button>
-            <div id="regMsg" class="msg"></div>
-            <span class="toggle-link" onclick="toggleForms()">Zaten onaylı mısınız? Giriş Yapın</span>
+
+            <div id="registerForm">
+                <div class="input-group">
+                    <label>Ad Soyad</label>
+                    <input type="text" id="regName" placeholder="Örn: Ahmet Yılmaz" autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label>OSM Nick</label>
+                    <input type="text" id="regNick" placeholder="Oyundaki adınız" autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label>Şifre Belirle</label>
+                    <input type="password" id="regPass" placeholder="••••••••" autocomplete="off">
+                </div>
+                
+                <button type="button" class="btn-main" onclick="register()">BAŞVURUYU GÖNDER</button>
+                <div id="regMsg" class="msg"></div>
+                <span class="toggle-link" onclick="toggleForms()">Giriş Ekranına Dön</span>
+            </div>
         </div>
+
+        <div class="sydhan-footer">POWERED BY <span>SYDHAN</span></div>
     </div>
-
-    <div class="sydhan-footer">POWERED BY SYDHAN</div>
 
     <script>
         const firebaseConfig = {
@@ -90,47 +225,62 @@
         function toggleForms() {
             const loginF = document.getElementById('loginForm');
             const regF = document.getElementById('registerForm');
-            loginF.style.display = loginF.style.display === 'none' ? 'block' : 'none';
-            regF.style.display = regF.style.display === 'block' ? 'none' : 'block';
+            // iOS tarzı yumuşak geçiş için
+            if(loginF.style.display === 'none') {
+                regF.style.display = 'none';
+                loginF.style.display = 'block';
+                loginF.style.animation = 'fadeIn 0.3s ease';
+            } else {
+                loginF.style.display = 'none';
+                regF.style.display = 'block';
+                regF.style.animation = 'fadeIn 0.3s ease';
+            }
             document.getElementById('loginMsg').style.display = 'none';
             document.getElementById('regMsg').style.display = 'none';
         }
 
+        // JS Animasyon Keyframes (Satıriçi eklendi)
+        const style = document.createElement('style');
+        style.innerHTML = `@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`;
+        document.head.appendChild(style);
+
         function showMessage(elementId, text, type) {
             const el = document.getElementById(elementId);
-            el.innerText = text; el.className = 'msg ' + type; el.style.display = 'block';
+            el.innerText = text; el.className = 'msg ' + type; 
+            el.style.display = 'block';
+            el.style.animation = 'fadeIn 0.3s ease';
         }
 
         function register() {
             try {
-                const name = document.getElementById('regName').value;
-                const nick = document.getElementById('regNick').value;
-                const pass = document.getElementById('regPass').value;
+                const name = document.getElementById('regName').value.trim();
+                const nick = document.getElementById('regNick').value.trim();
+                const pass = document.getElementById('regPass').value.trim();
 
-                if(!name || !nick || !pass) { showMessage('regMsg', 'HATA: Lütfen tüm alanları doldurun!', 'error'); return; }
+                if(!name || !nick || !pass) { showMessage('regMsg', 'Lütfen tüm alanları eksiksiz doldurun.', 'error'); return; }
 
-                showMessage('regMsg', 'Sisteme bağlanılıyor, lütfen bekleyin...', 'info');
+                showMessage('regMsg', 'Sisteme bağlanılıyor...', 'info');
 
                 db.collection("users").add({
                     adSoyad: name, osmNick: nick, sifre: pass, rol: "kullanici", durum: "onay_bekliyor", kayitTarihi: Date.now()
                 }).then(() => {
-                    showMessage('regMsg', 'BAŞARILI: Başvuru alındı! Yöneticinin onayını bekleyin.', 'success');
+                    showMessage('regMsg', 'Başvurunuz başarıyla alındı! Yönetici onayı bekleyin.', 'success');
                     document.getElementById('regName').value = ''; 
                     document.getElementById('regNick').value = '';
                     document.getElementById('regPass').value = '';
                 }).catch((err) => {
-                    showMessage('regMsg', 'HATA: ' + err.message, 'error');
+                    showMessage('regMsg', 'Bağlantı Hatası: ' + err.message, 'error');
                 });
-            } catch (error) { alert("Sistemsel Hata: " + error.message); }
+            } catch (error) { showMessage('regMsg', 'Sistemsel Hata: ' + error.message, 'error'); }
         }
 
         function login() {
-            const loginId = document.getElementById('loginId').value;
-            const loginPass = document.getElementById('loginPass').value;
+            const loginId = document.getElementById('loginId').value.trim();
+            const loginPass = document.getElementById('loginPass').value.trim();
 
-            if(!loginPass) { showMessage('loginMsg', 'Lütfen şifre girin.', 'error'); return; }
+            if(!loginPass || !loginId) { showMessage('loginMsg', 'Lütfen kullanıcı adı ve şifre girin.', 'error'); return; }
 
-            // YÖNETİCİ GİZLİ GİRİŞİ
+            // YÖNETİCİ GİZLİ GİRİŞİ (Değişmedi)
             if(loginPass === "3428") {
                 localStorage.setItem("sfk_kullanici", "TAKTIX Admin");
                 localStorage.setItem("sfk_rol", "admin");
@@ -138,17 +288,16 @@
                 return;
             }
 
-            if(!loginId) { showMessage('loginMsg', 'Nick girin.', 'error'); return; }
-            showMessage('loginMsg', 'Giriş yapılıyor...', 'info');
+            showMessage('loginMsg', 'Sisteme giriş yapılıyor...', 'info');
 
             db.collection("users").where("osmNick", "==", loginId).get().then((snapshot) => {
-                if(snapshot.empty) { showMessage('loginMsg', 'Kullanıcı bulunamadı.', 'error'); return; }
+                if(snapshot.empty) { showMessage('loginMsg', 'Kayıtlı kullanıcı bulunamadı.', 'error'); return; }
                 let userData = null;
                 snapshot.forEach(doc => { userData = doc.data(); });
 
-                if(userData.sifre !== loginPass) { showMessage('loginMsg', 'Hatalı şifre.', 'error'); return; }
+                if(userData.sifre !== loginPass) { showMessage('loginMsg', 'Hatalı şifre girdiniz.', 'error'); return; }
                 if(userData.durum === "onay_bekliyor") { showMessage('loginMsg', 'Hesabınız henüz onaylanmamış.', 'error'); return; }
-                if(userData.durum === "reddedildi") { showMessage('loginMsg', 'Hesabınız reddedilmiş.', 'error'); return; }
+                if(userData.durum === "reddedildi") { showMessage('loginMsg', 'Hesabınız reddedilmiştir.', 'error'); return; }
 
                 localStorage.setItem("sfk_kullanici", userData.osmNick);
                 localStorage.setItem("sfk_rol", "kullanici");
