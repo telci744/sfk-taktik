@@ -7,24 +7,35 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #000; color: #fff; margin: 0; padding: 20px; }
-        .header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #333; padding-bottom: 15px; }
-        .header h1 { color: #ff9500; margin: 0; font-size: 32px; letter-spacing: 2px; }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: #f4f6f8; color: #1c1c1e; margin: 0; padding: 20px; position: relative; }
+        
+        .btn-geri { position: absolute; top: 20px; left: 20px; background: white; color: #007aff; border: 1px solid #007aff; padding: 8px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .btn-geri:active { background: #e5f0ff; }
+
+        .header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #e5e5ea; padding-bottom: 15px; margin-top: 10px; }
+        .header h1 { color: #ff3b30; margin: 0; font-size: 32px; letter-spacing: 2px; } /* Mutfak olduğu için başlığı dikkat çekici kırmızı bıraktım */
         
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
-        .card { background: #1c1c1e; border: 1px solid #333; border-radius: 16px; padding: 20px; border-top: 8px solid #ff3b30; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .masa-baslik { font-size: 28px; font-weight: 900; margin-bottom: 15px; color: #fff; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .card { background: white; border: 1px solid #e5e5ea; border-radius: 16px; padding: 20px; border-top: 8px solid #ff3b30; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        .masa-baslik { font-size: 28px; font-weight: 900; margin-bottom: 15px; color: #1c1c1e; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f2f2f7; padding-bottom: 10px; }
         .zaman { font-size: 16px; color: #8e8e93; font-weight: bold; }
         
-        .urun { font-size: 22px; margin-bottom: 12px; font-weight: 600; display: flex; align-items: center; }
+        .urun { font-size: 22px; margin-bottom: 12px; font-weight: 600; display: flex; align-items: center; color: #3a3a3c; }
         .miktar { background: #ff3b30; color: #fff; padding: 4px 12px; border-radius: 8px; font-weight: 900; margin-right: 15px; }
         
-        .not { background: rgba(255, 214, 10, 0.1); color: #ffd60a; padding: 12px; border-radius: 10px; font-size: 18px; margin-top: 15px; border-left: 5px solid #ffd60a; font-weight: bold; }
-        .bos { text-align: center; color: #666; font-size: 28px; margin-top: 100px; grid-column: 1 / -1; font-weight: bold; }
+        .not { background: #fff5e5; color: #d97706; padding: 12px; border-radius: 10px; font-size: 18px; margin-top: 15px; border-left: 5px solid #f59e0b; font-weight: bold; line-height: 1.4; }
+        .bos { text-align: center; color: #8e8e93; font-size: 28px; margin-top: 100px; grid-column: 1 / -1; font-weight: bold; }
+        
+        @media (max-width: 600px) {
+            .btn-geri { position: static; display: inline-block; margin-bottom: 15px; }
+            .header { margin-top: 0; }
+        }
     </style>
 </head>
 <body>
-    <div class="header"><h1>🍳 AKTİF SİPARİŞLER (MUTFAK)</h1></div>
+    <a href="index.html" class="btn-geri">⬅ Ana Ekran</a>
+    <div class="header"><h1>🍳 AKTİF SİPARİŞLER</h1></div>
     <div class="grid" id="mutfakGrid">Yükleniyor...</div>
 
     <script>
@@ -41,7 +52,6 @@
                 const veri = doc.data();
                 if(veri.yeniSiparisUrunleri && veri.yeniSiparisUrunleri.length > 0) {
                     veri.yeniSiparisUrunleri.forEach(grup => {
-                        // Sadece teslim edilmemiş (teslimEdildi: false) olanları ekrana bas
                         if(!grup.teslimEdildi) {
                             siparisVarMi = true;
                             const saat = new Date(grup.eklenmeZamani).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});

@@ -8,18 +8,24 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: -apple-system, sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; color: #1c1c1e; padding-top: env(safe-area-inset-top); }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e5ea; padding-bottom: 15px; margin-bottom: 20px; }
-        .header h1 { font-size: 22px; color: #007aff; margin: 0; }
-        .karsilama { font-size: 13px; color: #8e8e93; margin-top: 5px; font-weight: 600; }
+        body { font-family: -apple-system, sans-serif; background-color: #e5e5ea; margin: 0; padding: 0; color: #1c1c1e; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
         
-        .canli-ikon { font-size: 13px; color: #34c759; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+        /* Kasa ekranı tabletlerde de rahat kullanılsın diye max-width'i biraz daha geniş tuttuk */
+        .app-wrapper { width: 100%; max-width: 768px; background-color: #f4f6f8; min-height: 100vh; position: relative; box-shadow: 0 0 30px rgba(0,0,0,0.1); padding: 20px; padding-top: max(20px, env(safe-area-inset-top)); }
+
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e5ea; padding-bottom: 15px; margin-bottom: 20px; }
+        .header-sol { display: flex; flex-direction: column; gap: 5px; }
+        .header h1 { font-size: 20px; color: #007aff; margin: 0; }
+        .karsilama { font-size: 13px; color: #8e8e93; font-weight: 600; }
+        
+        .header-sag { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+        .canli-ikon { font-size: 12px; color: #34c759; font-weight: 800; display: flex; align-items: center; gap: 6px; }
         .canli-ikon::before { content: ""; display: block; width: 8px; height: 8px; background: #34c759; border-radius: 50%; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.7); } 70% { box-shadow: 0 0 0 8px rgba(52, 199, 89, 0); } 100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); } }
         
-        .nav-link { background: white; color: #007aff; border: 1px solid #007aff; text-decoration: none; font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 8px; margin-right: 15px; }
+        .btn-nav { background: #e5f0ff; color: #007aff; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 12px; text-align: center; }
         
-        .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
         .masa-card { background: white; border: 1px solid #e5e5ea; border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); }
         .masa-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f2f2f7; padding-bottom: 12px; margin-bottom: 15px; }
         .masa-header h2 { margin: 0; color: #1c1c1e; font-size: 20px; }
@@ -30,7 +36,6 @@
         .urun-satir { display: flex; justify-content: space-between; margin-bottom: 4px; }
         .urun-satir b { color: #007aff; }
 
-        /* Aşçıya Not Tasarımı */
         .siparis-notu { background: #fff5e5; color: #d97706; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-top: 10px; border-left: 4px solid #f59e0b; line-height: 1.5; }
 
         .toplam-tutar { font-size: 18px; font-weight: 900; color: #1c1c1e; margin-bottom: 15px; text-align: right; }
@@ -39,18 +44,23 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <div>
-            <h1>MAVİKONAK KASA</h1>
-            <div id="karsilamaMetni" class="karsilama">Yükleniyor...</div>
+    <div class="app-wrapper">
+        <div class="header">
+            <div class="header-sol">
+                <h1>MAVİKONAK KASA</h1>
+                <div id="karsilamaMetni" class="karsilama">Yükleniyor...</div>
+            </div>
+            <div class="header-sag">
+                <div class="canli-ikon">Sistem Canlı</div>
+                <div style="display:flex; gap:5px;">
+                    <a href="index.html" class="btn-nav">⬅ Ana Ekran</a>
+                    <a href="kurum.html" class="btn-nav">Menü Ayarları</a>
+                </div>
+            </div>
         </div>
-        <div style="display:flex; align-items:center;">
-            <a href="kurum.html" class="nav-link">Menü / Resim Ekle</a>
-            <div class="canli-ikon">Canlı</div>
-        </div>
-    </div>
 
-    <div id="aktifMasalar" class="grid-container"></div>
+        <div id="aktifMasalar" class="grid-container"></div>
+    </div>
 
     <script>
         let yoneticiAdi = localStorage.getItem("mavikonak_isim");
@@ -85,7 +95,6 @@
 
                         let notHtml = grup.not ? `<div class="siparis-notu">👨‍🍳 <b>Aşçıya Not:</b> ${grup.not}</div>` : '';
                         
-                        // Mutfak Kontrol Butonu
                         let durumHtml = grup.teslimEdildi 
                             ? `<div style="color:#34c759; font-size:12px; font-weight:bold; margin-top:8px;">✓ Masaya Teslim Edildi</div>`
                             : `<button style="background:#007aff; color:white; border:none; padding:8px 12px; border-radius:8px; font-weight:bold; cursor:pointer; margin-top:10px; font-size:12px; width:100%; box-shadow: 0 2px 8px rgba(0,122,255,0.2);" onclick="siparisTeslimEdildi('${doc.id}', ${grup.siparisId})">🔔 Masaya Teslim Edildi İşaretle</button>`;
@@ -121,9 +130,7 @@
                 if(doc.exists) {
                     const veri = doc.data();
                     const yeniDizi = veri.yeniSiparisUrunleri.map(grup => {
-                        if(grup.siparisId === siparisId) {
-                            return { ...grup, teslimEdildi: true };
-                        }
+                        if(grup.siparisId === siparisId) { return { ...grup, teslimEdildi: true }; }
                         return grup;
                     });
                     ref.update({ yeniSiparisUrunleri: yeniDizi });

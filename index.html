@@ -12,10 +12,8 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #e5e5ea; margin: 0; padding: 0; color: #1c1c1e; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
         
-        /* PC ve Mobil Uyumu İçin Ana Taşıyıcı (Mobil Görünümü Verir) */
         .app-wrapper { width: 100%; max-width: 480px; background-color: #f4f6f8; min-height: 100vh; position: relative; box-shadow: 0 0 30px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
 
-        /* Masa Seçim Ekranı Tasarımı */
         .masa-secim-ekrani { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; text-align: center; background: white; z-index: 100; height: 100vh; width: 100%; max-width: 480px; position: absolute; top: 0; left: 0; }
         .masa-secim-ekrani h1 { color: #007aff; font-size: 28px; margin-bottom: 10px; font-weight: 800; }
         .masa-secim-ekrani p { color: #8e8e93; font-size: 15px; margin-bottom: 30px; font-weight: 600; }
@@ -26,7 +24,10 @@
         
         .btn-menuye-gec { width: 100%; background: #007aff; color: white; border: none; padding: 16px; border-radius: 14px; font-weight: 800; font-size: 16px; margin-top: 20px; cursor: pointer; display: none; box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3); }
 
-        /* Ana İçerik Tasarımı */
+        .yetkili-paneli { margin-top: auto; padding-top: 30px; display: flex; gap: 10px; justify-content: center; width: 100%; }
+        .btn-yetkili { background: transparent; color: #a1a1aa; border: 1px solid #e5e5ea; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        .btn-yetkili:active { background: #e5e5ea; color: #1c1c1e; }
+
         .header { background: #ffffff; padding: 15px 20px 10px 20px; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding-top: max(15px, env(safe-area-inset-top)); }
         .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .header h1 { font-size: 22px; font-weight: 800; color: #007aff; margin: 0; }
@@ -77,6 +78,19 @@
         .not-input:focus { border-color: #007aff; background: white; }
 
         .btn-onayla { width: 100%; background: #34c759; color: white; border: none; padding: 16px; border-radius: 14px; font-weight: 800; font-size: 16px; cursor: pointer; box-shadow: 0 4px 15px rgba(52, 199, 89, 0.3); }
+
+        /* Yeni Apple Tarzı Şifre Modal CSS */
+        .sifre-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 200; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+        .sifre-kutu { background: rgba(255, 255, 255, 0.95); width: 85%; max-width: 320px; border-radius: 20px; padding: 25px 20px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .sifre-kutu h3 { margin: 0 0 8px 0; font-size: 18px; color: #1c1c1e; }
+        .sifre-kutu p { margin: 0 0 20px 0; font-size: 13px; color: #8e8e93; }
+        .sifre-input-alan { width: 100%; border: 1px solid #c7c7cc; border-radius: 12px; padding: 14px; font-size: 18px; text-align: center; margin-bottom: 20px; outline: none; background: #f2f2f7; transition: 0.2s; letter-spacing: 4px; font-weight: bold; }
+        .sifre-input-alan:focus { border-color: #007aff; background: #fff; }
+        .sifre-btn-grup { display: flex; gap: 10px; }
+        .sifre-btn-grup button { flex: 1; padding: 12px; border-radius: 12px; font-weight: 700; font-size: 15px; cursor: pointer; border: none; }
+        .btn-iptal { background: #e5e5ea; color: #ff3b30; }
+        .btn-giris { background: #007aff; color: #fff; }
     </style>
 </head>
 <body>
@@ -85,9 +99,14 @@
         <div id="masaSecimEkrani" class="masa-secim-ekrani">
             <h1>MAVİKONAK</h1>
             <p>Lütfen bulunduğunuz masayı seçin</p>
-            <div class="masa-grid" id="masaGrid">
-                </div>
+            <div class="masa-grid" id="masaGrid"></div>
             <button id="btnMasaOnay" class="btn-menuye-gec" onclick="masayiOnayla()">MENÜYE GEÇ</button>
+
+            <div class="yetkili-paneli">
+                <button class="btn-yetkili" onclick="yetkiliGiris('yonetim.html')">Kasa</button>
+                <button class="btn-yetkili" onclick="yetkiliGiris('mutfak.html')">Mutfak</button>
+                <button class="btn-yetkili" onclick="yetkiliGiris('kurum.html')">Menü</button>
+            </div>
         </div>
 
         <div id="anaMenuEkrani" style="display: none; height: 100%; flex-direction: column;">
@@ -120,14 +139,23 @@
                     <h2>Sepetim</h2>
                     <button class="kapat-btn" onclick="sepetModalKapat()">✕</button>
                 </div>
-                
                 <div class="modal-liste" id="modalSepetListe"></div>
-
                 <div class="not-alani">
                     <textarea id="siparisNotu" class="not-input" placeholder="Aşçıya özel bir notunuz var mı?"></textarea>
                 </div>
-
                 <button class="btn-onayla" onclick="siparisGonder()">SİPARİŞİ ONAYLA</button>
+            </div>
+        </div>
+
+        <div class="sifre-overlay" id="appleSifreModal" onclick="if(event.target==this) sifreModalKapat()">
+            <div class="sifre-kutu">
+                <h3>Yönetici Girişi</h3>
+                <p>Devam etmek için şifre giriniz.</p>
+                <input type="password" id="yetkiliSifreInput" class="sifre-input-alan" placeholder="••••" inputmode="numeric" maxlength="4">
+                <div class="sifre-btn-grup">
+                    <button class="btn-iptal" onclick="sifreModalKapat()">İptal</button>
+                    <button class="btn-giris" onclick="sifreKontrolEt()">Giriş</button>
+                </div>
             </div>
         </div>
 
@@ -144,12 +172,40 @@
         let seciliKategori = "Tümü";
         let sepet = {}; 
         let geciciAdet = {}; 
+        let bekleyenSayfa = ""; // Şifre doğru girilirse gidilecek sayfa
 
         const fallbackImg = "https://firebasestorage.googleapis.com/v0/b/sfk-taktik.firebasestorage.app/o/default-food.png?alt=media";
 
-        window.onload = () => {
-            masaButonlariniOlustur();
-        };
+        window.onload = () => { masaButonlariniOlustur(); };
+
+        // YENİ: Şifre Modal Fonksiyonları
+        function yetkiliGiris(hedefSayfa) {
+            bekleyenSayfa = hedefSayfa;
+            document.getElementById('yetkiliSifreInput').value = "";
+            document.getElementById('appleSifreModal').style.display = 'flex';
+            setTimeout(() => document.getElementById('yetkiliSifreInput').focus(), 100);
+        }
+
+        function sifreModalKapat() {
+            document.getElementById('appleSifreModal').style.display = 'none';
+        }
+
+        function sifreKontrolEt() {
+            const sifre = document.getElementById('yetkiliSifreInput').value;
+            if (sifre === "1888") {
+                window.location.href = bekleyenSayfa;
+            } else {
+                alert("Hatalı şifre!");
+                document.getElementById('yetkiliSifreInput').value = "";
+                document.getElementById('yetkiliSifreInput').focus();
+            }
+        }
+
+        // Enter tuşuna basınca da giriş yapsın
+        document.getElementById('yetkiliSifreInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') sifreKontrolEt();
+        });
+
 
         function masaButonlariniOlustur() {
             let html = "";
@@ -160,9 +216,7 @@
         }
 
         function masaSec(masaNo) {
-            // Önceki seçiliyi temizle
             document.querySelectorAll('.masa-btn').forEach(b => b.classList.remove('secili'));
-            // Yeniyi seç
             document.getElementById('masaBtn_' + masaNo).classList.add('secili');
             secilenGeciciMasa = masaNo;
             document.getElementById('btnMasaOnay').style.display = 'block';
@@ -203,10 +257,7 @@
             });
         }
 
-        function kategoriSec(kat) {
-            seciliKategori = kat;
-            menuYukle(); 
-        }
+        function kategoriSec(kat) { seciliKategori = kat; menuYukle(); }
 
         function urunleriCiz() {
             const liste = document.getElementById("menuListesi");
@@ -267,10 +318,7 @@
             const eskiMetin = btn.innerText;
             btn.innerText = "✓ Eklendi";
             btn.style.background = "#34c759";
-            setTimeout(() => {
-                btn.innerText = eskiMetin;
-                btn.style.background = "#007aff";
-            }, 800);
+            setTimeout(() => { btn.innerText = eskiMetin; btn.style.background = "#007aff"; }, 800);
         }
 
         function sepetIciAdetDegistir(id, yon) {
@@ -282,9 +330,7 @@
         }
 
         function sepetiGuncelleUI() {
-            let toplamMiktar = 0;
-            let tutar = 0;
-            let modalHtml = "";
+            let toplamMiktar = 0; let tutar = 0; let modalHtml = "";
 
             for(let id in sepet) {
                 let urun = sepet[id];
