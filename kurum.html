@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Menü & Fotoğraf Yönetimi</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
+
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; color: #1c1c1e; padding-top: env(safe-area-inset-top); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e5ea; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h1 { font-size: 20px; color: #007aff; margin: 0; }
+        .btn-nav { background: #e5f0ff; color: #007aff; border: none; padding: 8px 15px; border-radius: 10px; font-weight: 700; cursor: pointer; text-decoration: none; font-size: 13px; }
+        
+        .form-card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #e5e5ea; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-size: 13px; color: #8e8e93; margin-bottom: 6px; font-weight: 700; }
+        .input-group input, .input-group select { width: 100%; padding: 14px; border-radius: 12px; border: 1.5px solid #e5e5ea; background: #fafafa; font-size: 15px; outline: none; transition: 0.2s; }
+        .input-group input:focus, .input-group select:focus { border-color: #007aff; background: white; }
+        
+        /* Dosya Yükleme Özel Tasarım */
+        input[type="file"] { padding: 10px; background: white; font-size: 13px; }
+        
+        .btn-ekle { width: 100%; background: #007aff; color: white; border: none; padding: 16px; border-radius: 12px; font-weight: 800; font-size: 15px; cursor: pointer; transition: 0.2s; }
+        .btn-ekle:disabled { background: #a1c9f7; cursor: not-allowed; }
+
+        .kategori-baslik { color: #1c1c1e; border-bottom: 2px solid #e5e5ea; padding-bottom: 5px; margin-top: 25px; margin-bottom: 15px; font-size: 18px; }
+        .urun-satir { display: flex; align-items: center; background: white; padding: 10px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #e5e5ea; }
+        .urun-kucuk-img { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; margin-right: 15px; background: #f2f2f7; }
+        .urun-info { flex: 1; }
+        .urun-info h4 { margin: 0 0 4px 0; font-size: 15px; }
+        .urun-info p { margin: 0; color: #007aff; font-weight: 700; font-size: 13px; }
+        .btn-sil { background: #ffe5e5; color: #ff3b30; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>MENÜ YÖNETİMİ</h1>
+        <a href="yonetim.html" class="btn-nav">Kasaya Dön</a>
+    </div>
+
+    <div class="form-card">
+        <div class="input-group">
+            <label>ÜRÜN ADI</label>
+            <input type="text" id="uAd" placeholder="Örn: Et Döner">
+        </div>
+        <div class="input-group">
+            <label>KATEGORİ</label>
+            <select id="uKat">
+                <option value="Çorba">Çorba</option>
+                <option value="Et Menü">Et Menü</option>
+                <option value="Tavuk Menü">Tavuk Menü</option>
+                <option value="İçecek">İçecek</option>
+                <option value="Tatlı">Tatlı</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>FİYAT (₺)</label>
+            <input type="number" id="uFiyat" placeholder="Örn: 150">
+        </div>
+        <div class="input-group">
+            <label>ÜRÜN FOTOĞRAFI (İsteğe Bağlı)</label>
+            <input type="file" id="uResim" accept="image/*">
+        </div>
+        <button id="btnKaydet" class="btn-ekle" onclick="urunuKaydet()">MENÜYE EKLE</button>
+    </div>
+
+    <div id="listeAlani"></div>
+
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyD_zEbZek8IyacdHojnBpb4cWTIvBSdOtk", authDomain: "sfk-taktik.firebaseapp.com", projectId: "sfk-taktik", storageBucket: "sfk-taktik.firebasestorage.app", messagingSenderId: "773612917206", appId: "1:773612917206:web:6c21289cc1fc179c5a9477" };
+        firebase.initializeApp(firebaseConfig); 
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        function urunuKaydet() {
+            const ad = document.getElementById("uAd").value.trim();
+            const kat = document.getElementById("uKat").value;
+            const fiyat = parseInt(document.getElementById("uFiyat").value);
+            const fileInput = document.getElementById("uResim");
+            const btn = document.getElementById("btnKaydet");
+
+            if(!ad || !fiyat || isNaN(fiyat)) { alert("Ürün adı ve geçerli bir fiyat zorunludur."); return; }
+
+            btn.disabled = true;
+            btn.innerText = "Yükleniyor...";
+
+            // Eğer fotoğraf seçildiyse önce Storage'a yükle, linkini al
+            if(fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const storageRef = storage.ref('menuler/' + Date.now() + '_' + file.name);
+                
+                storageRef.put(file).then(snapshot => {
+                    return snapshot.ref.getDownloadURL();
+                }).then(url => {
+                    veriTabaninaYaz(ad, kat, fiyat, url);
+                }).catch(err => {
+                    alert("Fotoğraf yüklenemedi. Firebase kurallarınızı kontrol edin. Hata: " + err);
+                    btn.disabled = false; btn.innerText = "MENÜYE EKLE";
+                });
+            } else {
+                // Fotoğraf seçilmediyse resmi boş gönder
+                veriTabaninaYaz(ad, kat, fiyat, "");
+            }
+        }
+
+        function veriTabaninaYaz(ad, kat, fiyat, resimUrl) {
+            db.collection("menuler").add({
+                ad: ad, kategori: kat, fiyat: fiyat, resimUrl: resimUrl, tarih: Date.now()
+            }).then(() => {
+                document.getElementById("uAd").value = "";
+                document.getElementById("uFiyat").value = "";
+                document.getElementById("uResim").value = "";
+                document.getElementById("btnKaydet").disabled = false;
+                document.getElementById("btnKaydet").innerText = "MENÜYE EKLE";
+            });
+        }
+
+        function urunSil(id) {
+            if(confirm('Ürün menüden kalıcı olarak silinecek. Onaylıyor musunuz?')) {
+                db.collection("menuler").doc(id).delete();
+            }
+        }
+
+        db.collection("menuler").orderBy("tarih", "asc").onSnapshot(snap => {
+            const liste = document.getElementById("listeAlani");
+            if(snap.empty) { liste.innerHTML = "<p style='text-align:center; color:gray;'>Ürün bulunamadı.</p>"; return; }
+
+            const kategoriler = { "Çorba": [], "Et Menü": [], "Tavuk Menü": [], "İçecek": [], "Tatlı": [] };
+            snap.forEach(doc => { const u = doc.data(); if(kategoriler[u.kategori]) kategoriler[u.kategori].push({ id: doc.id, ...u }); });
+
+            let html = "";
+            for(let kat in kategoriler) {
+                if(kategoriler[kat].length > 0) {
+                    html += `<h3 class="kategori-baslik">${kat}</h3>`;
+                    kategoriler[kat].forEach(urun => {
+                        const img = urun.resimUrl ? `<img src="${urun.resimUrl}" class="urun-kucuk-img">` : `<div class="urun-kucuk-img"></div>`;
+                        html += `
+                        <div class="urun-satir">
+                            ${img}
+                            <div class="urun-info">
+                                <h4>${urun.ad}</h4>
+                                <p>${urun.fiyat} ₺</p>
+                            </div>
+                            <button class="btn-sil" onclick="urunSil('${urun.id}')">Sil</button>
+                        </div>`;
+                    });
+                }
+            }
+            liste.innerHTML = html;
+        });
+    </script>
+</body>
+</html>
