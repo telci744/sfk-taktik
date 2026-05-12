@@ -96,8 +96,10 @@
 <body>
     <div class="app-wrapper">
         
-        <div id="masaSecimEkrani" class="masa-secim-ekrani">
-            <h1>MAVİKONAK</h1>
+       <div id="masaSecimEkrani" class="masa-secim-ekrani">
+            <div id="anaLogoAlani">
+                <h1>MAVİKONAK</h1>
+            </div>
             <p>Lütfen bulunduğunuz masayı seçin</p>
             <div class="masa-grid" id="masaGrid"></div>
             <button id="btnMasaOnay" class="btn-menuye-gec" onclick="masayiOnayla()">MENÜYE GEÇ</button>
@@ -112,9 +114,11 @@
         <div id="anaMenuEkrani" style="display: none; height: 100%; flex-direction: column;">
             <div class="header">
                 <div class="header-top">
+                <div id="ustLogoAlani">
                     <h1>Mavikonak</h1>
-                    <div class="masa-badge" onclick="masaDegistir()">Masa <span id="masaNoTxt">-</span></div>
                 </div>
+                <div class="masa-badge" onclick="masaDegistir()">Masa <span id="masaNoTxt">-</span></div>
+            </div>
                 <div class="kategori-scroll" id="kategoriListesi"></div>
             </div>
             
@@ -176,7 +180,29 @@
 
         const fallbackImg = "https://firebasestorage.googleapis.com/v0/b/sfk-taktik.firebasestorage.app/o/default-food.png?alt=media";
 
-        window.onload = () => { masaButonlariniOlustur(); };
+        window.onload = () => { 
+            masaButonlariniOlustur(); 
+            logoAyarla();
+        };
+
+       function logoAyarla() {
+            db.collection("ayarlar").doc("genel").onSnapshot(doc => {
+                const anaLogo = document.getElementById("anaLogoAlani");
+                const ustLogo = document.getElementById("ustLogoAlani");
+                
+                if(doc.exists && doc.data().logoUrl && doc.data().logoUrl.trim() !== "") {
+                    const url = doc.data().logoUrl;
+                    
+                    // mix-blend-mode: multiply eklendi (Beyaz arka planı şeffaf yapar)
+                    anaLogo.innerHTML = `<img src="${url}" onerror="this.onerror=null; this.parentElement.innerHTML='<h1>MAVİKONAK</h1>';" style="max-height: 120px; max-width: 80%; object-fit: contain; margin-bottom: 10px; mix-blend-mode: multiply;">`;
+                    
+                    ustLogo.innerHTML = `<img src="${url}" onerror="this.onerror=null; this.parentElement.innerHTML='<h1>Mavikonak</h1>';" style="max-height: 35px; object-fit: contain; mix-blend-mode: multiply;">`;
+                } else {
+                    anaLogo.innerHTML = `<h1>MAVİKONAK</h1>`;
+                    ustLogo.innerHTML = `<h1>Mavikonak</h1>`;
+                }
+            });
+        }
 
         // YENİ: Şifre Modal Fonksiyonları
         function yetkiliGiris(hedefSayfa) {

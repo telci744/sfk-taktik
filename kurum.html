@@ -7,7 +7,6 @@
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
 
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -25,14 +24,12 @@
         .input-group input, .input-group select { width: 100%; padding: 14px; border-radius: 12px; border: 1.5px solid #e5e5ea; background: #fafafa; font-size: 15px; outline: none; transition: 0.2s; }
         .input-group input:focus, .input-group select:focus { border-color: #007aff; background: white; }
         
-        input[type="file"] { padding: 10px; background: white; font-size: 13px; }
-        
         .btn-ekle { width: 100%; background: #007aff; color: white; border: none; padding: 16px; border-radius: 12px; font-weight: 800; font-size: 15px; cursor: pointer; transition: 0.2s; }
         .btn-ekle:disabled { background: #a1c9f7; cursor: not-allowed; }
 
         .kategori-baslik { color: #1c1c1e; border-bottom: 2px solid #e5e5ea; padding-bottom: 5px; margin-top: 25px; margin-bottom: 15px; font-size: 18px; }
         .urun-satir { display: flex; align-items: center; background: white; padding: 10px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #e5e5ea; }
-        .urun-kucuk-img { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; margin-right: 15px; background: #f2f2f7; }
+        .urun-kucuk-img { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; margin-right: 15px; background: #f2f2f7; flex-shrink: 0; }
         .urun-info { flex: 1; }
         .urun-info h4 { margin: 0 0 4px 0; font-size: 15px; }
         .urun-info p { margin: 0; color: #007aff; font-weight: 700; font-size: 13px; }
@@ -45,6 +42,14 @@
             <a href="index.html" class="btn-nav">⬅ Ana Ekran</a>
             <h1>MENÜ YÖNETİMİ</h1>
             <a href="yonetim.html" class="btn-nav">Kasa ➡</a>
+        </div>
+
+        <div class="form-card" style="margin-bottom: 20px;">
+            <div class="input-group">
+                <label>SİSTEM LOGOSU (Link Olarak)</label>
+                <input type="url" id="sistemLogoUrl" placeholder="Örn: https://site.com/logo.png">
+            </div>
+            <button id="btnLogoKaydet" class="btn-ekle" style="background:#34c759;" onclick="logoKaydet()">LOGOYU GÜNCELLE</button>
         </div>
 
         <div class="form-card">
@@ -67,8 +72,8 @@
                 <input type="number" id="uFiyat" placeholder="Örn: 150">
             </div>
             <div class="input-group">
-                <label>ÜRÜN FOTOĞRAFI (İsteğe Bağlı)</label>
-                <input type="file" id="uResim" accept="image/*">
+                <label>RESİM LİNKİ (İsteğe Bağlı)</label>
+                <input type="url" id="uResimUrl" placeholder="Örn: https://site.com/resim.jpg">
             </div>
             <button id="btnKaydet" class="btn-ekle" onclick="urunuKaydet()">MENÜYE EKLE</button>
         </div>
@@ -79,36 +84,41 @@
     <script>
         const firebaseConfig = { apiKey: "AIzaSyD_zEbZek8IyacdHojnBpb4cWTIvBSdOtk", authDomain: "sfk-taktik.firebaseapp.com", projectId: "sfk-taktik", storageBucket: "sfk-taktik.firebasestorage.app", messagingSenderId: "773612917206", appId: "1:773612917206:web:6c21289cc1fc179c5a9477" };
         firebase.initializeApp(firebaseConfig); 
-        const db = firebase.firestore();
-        const storage = firebase.storage();
+       const db = firebase.firestore();
+
+        // Ayarları ve logoyu yükle
+        db.collection("ayarlar").doc("genel").get().then(doc => {
+            if(doc.exists && doc.data().logoUrl) {
+                document.getElementById("sistemLogoUrl").value = doc.data().logoUrl;
+            }
+        });
+
+        function logoKaydet() {
+            const logoUrl = document.getElementById("sistemLogoUrl").value.trim();
+            const btn = document.getElementById("btnLogoKaydet");
+            btn.innerText = "Güncelleniyor...";
+            
+            db.collection("ayarlar").doc("genel").set({
+                logoUrl: logoUrl
+            }, { merge: true }).then(() => {
+                btn.innerText = "LOGOYU GÜNCELLE";
+                alert("Logo başarıyla güncellendi! Müşteri ekranında anında değişecektir.");
+            });
+        }
 
         function urunuKaydet() {
             const ad = document.getElementById("uAd").value.trim();
             const kat = document.getElementById("uKat").value;
             const fiyat = parseInt(document.getElementById("uFiyat").value);
-            const fileInput = document.getElementById("uResim");
+            const resimUrl = document.getElementById("uResimUrl").value.trim();
             const btn = document.getElementById("btnKaydet");
 
             if(!ad || !fiyat || isNaN(fiyat)) { alert("Ürün adı ve geçerli bir fiyat zorunludur."); return; }
 
             btn.disabled = true;
-            btn.innerText = "Yükleniyor...";
+            btn.innerText = "Ekleniyor...";
 
-            if(fileInput.files.length > 0) {
-                const file = fileInput.files[0];
-                const storageRef = storage.ref('menuler/' + Date.now() + '_' + file.name);
-                
-                storageRef.put(file).then(snapshot => {
-                    return snapshot.ref.getDownloadURL();
-                }).then(url => {
-                    veriTabaninaYaz(ad, kat, fiyat, url);
-                }).catch(err => {
-                    alert("Fotoğraf yüklenemedi. Firebase kurallarınızı kontrol edin. Hata: " + err);
-                    btn.disabled = false; btn.innerText = "MENÜYE EKLE";
-                });
-            } else {
-                veriTabaninaYaz(ad, kat, fiyat, "");
-            }
+            veriTabaninaYaz(ad, kat, fiyat, resimUrl);
         }
 
         function veriTabaninaYaz(ad, kat, fiyat, resimUrl) {
@@ -117,7 +127,11 @@
             }).then(() => {
                 document.getElementById("uAd").value = "";
                 document.getElementById("uFiyat").value = "";
-                document.getElementById("uResim").value = "";
+                document.getElementById("uResimUrl").value = "";
+                document.getElementById("btnKaydet").disabled = false;
+                document.getElementById("btnKaydet").innerText = "MENÜYE EKLE";
+            }).catch(err => {
+                alert("Hata oluştu: " + err);
                 document.getElementById("btnKaydet").disabled = false;
                 document.getElementById("btnKaydet").innerText = "MENÜYE EKLE";
             });
@@ -141,7 +155,8 @@
                 if(kategoriler[kat].length > 0) {
                     html += `<h3 class="kategori-baslik">${kat}</h3>`;
                     kategoriler[kat].forEach(urun => {
-                        const img = urun.resimUrl ? `<img src="${urun.resimUrl}" class="urun-kucuk-img">` : `<div class="urun-kucuk-img"></div>`;
+                        const imgError = "this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' fill=\\'%23f2f2f7\\'><rect width=\\'100%\\' height=\\'100%\\'/></svg>';";
+                        const img = urun.resimUrl ? `<img src="${urun.resimUrl}" class="urun-kucuk-img" onerror="${imgError}">` : `<div class="urun-kucuk-img"></div>`;
                         html += `
                         <div class="urun-satir">
                             ${img}
