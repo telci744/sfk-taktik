@@ -6,6 +6,7 @@
     <title>Anımsatıcılar</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
 
@@ -756,15 +757,14 @@
         appId: "1:773612917206:web:6c21289cc1fc179c5a9477"
     };
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    const db      = firebase.firestore();
+    const storage = firebase.storage();
 
     // ── Sabitler & Durum ──────────────────────────────────────
-    const SUNUCU = '';
-
-    let tumVeri       = [];
-    let aktifFiltre   = "tumu";
-    let seciliOncelik = "orta";
-    let secilenDosya  = null;
+    let tumVeri           = [];
+    let aktifFiltre       = "tumu";
+    let seciliOncelik     = "orta";
+    let secilenDosya      = null;
     let yuklenenDosyaUrl  = null;
     let yuklenenDosyaAdi  = null;
     let aktifGonderimId   = null;
@@ -776,28 +776,20 @@
     const bugun = new Date();
     document.getElementById("inputTarih").value = bugun.toISOString().split("T")[0];
 
-    // WhatsApp durumunu periyodik kontrol et
-    wpDurumKontrol();
-    setInterval(wpDurumKontrol, 5000);
-
-    // Firebase realtime
+    // Anımsatıcılar — gerçek zamanlı
     db.collection("animsaticilar").orderBy("olusturulma", "desc").onSnapshot(snap => {
         tumVeri = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         listeyiGuncelle();
     });
 
-    // ── WhatsApp Durum ────────────────────────────────────────
-    async function wpDurumKontrol() {
-        try {
-            const r = await fetch(`${SUNUCU}/durum`, { signal: AbortSignal.timeout(4000) });
-            const veri = await r.json();
-            wpHazir = veri.hazir;
-            wpBarGuncelle(veri.hazir, veri.qr);
-        } catch {
-            wpHazir = false;
-            wpBarGuncelle(false, null, true);
-        }
-    }
+    // WhatsApp durumu — Firestore gerçek zamanlı (HTTP yok, mixed content yok)
+    db.collection("durum").doc("whatsapp").onSnapshot(snap => {
+        const veri = snap.data() || {};
+        wpHazir = veri.hazir || false;
+        const eskiMs = veri.ts ? (Date.now() - veri.ts) : 999999;
+        const sunucuYok = !veri.hazir && !veri.qr && eskiMs > 60000;
+        wpBarGuncelle(veri.hazir, veri.qr, sunucuYok);
+    });
 
     function wpBarGuncelle(hazir, qr, sunucuYok = false) {
         const bar   = document.getElementById('wpBar');
@@ -825,25 +817,20 @@
     }
 
     // ── QR Modal ─────────────────────────────────────────────
-    async function qrModalAc() {
+    function qrModalAc() {
         modalAcGoster('qrOverlay');
-        qrIcerikGuncelle();
-        // QR her 15s yenile (QR'ın geçerlilik süresi ~20s)
-        window._qrInterval = setInterval(qrIcerikGuncelle, 15000);
-    }
-
-    async function qrIcerikGuncelle() {
-        const icerik = document.getElementById('qrIcerik');
-        try {
-            const r    = await fetch(`${SUNUCU}/durum`, { signal: AbortSignal.timeout(4000) });
-            const veri = await r.json();
+        // Firestore'u gerçek zamanlı dinle — HTTP yok
+        window._qrUnsubscribe = db.collection("durum").doc("whatsapp").onSnapshot(snap => {
+            const veri   = snap.data() || {};
+            const icerik = document.getElementById('qrIcerik');
+            if (!icerik) return;
 
             if (veri.hazir) {
                 icerik.innerHTML = `
                     <div style="font-size:60px;">✅</div>
                     <div style="font-size:18px;font-weight:800;color:#34c759;">WhatsApp Bağlandı!</div>
                     <div style="color:#8e8e93;font-size:14px;">Artık mesaj gönderebilirsiniz.</div>`;
-                clearInterval(window._qrInterval);
+                if (window._qrUnsubscribe) { window._qrUnsubscribe(); window._qrUnsubscribe = null; }
                 setTimeout(() => modalKapat('qrOverlay'), 2000);
                 return;
             }
@@ -860,14 +847,7 @@
             } else {
                 icerik.innerHTML = `<div class="qr-bekliyor"><div class="spinner"></div><span>QR kodu bekleniyor...</span></div>`;
             }
-        } catch {
-            icerik.innerHTML = `
-                <div style="text-align:center;color:#ff3b30;padding:20px;">
-                    <div style="font-size:40px;margin-bottom:12px;">⚠️</div>
-                    <div style="font-weight:700;">Sunucuya ulaşılamıyor</div>
-                    <div style="font-size:13px;color:#8e8e93;margin-top:6px;">Terminalde "node server.js" çalıştırın</div>
-                </div>`;
-        }
+        });
     }
 
     // ── Liste Güncelleme ──────────────────────────────────────
@@ -1012,17 +992,27 @@
         const barBg = document.getElementById("yuklenmeBarBg");
         const bar   = document.getElementById("yuklenmeBar");
         barBg.style.display = "block";
-        bar.style.width = "30%";
+        bar.style.width = "5%";
 
-        const form = new FormData();
-        form.append("dosya", dosya);
+        const uzanti   = dosya.name.includes('.') ? dosya.name.split('.').pop() : '';
+        const dosyaYol = `uploads/${Date.now()}_${Math.random().toString(36).slice(2,6)}${uzanti ? '.' + uzanti : ''}`;
+        const ref      = storage.ref().child(dosyaYol);
+        const task     = ref.put(dosya);
 
-        const r = await fetch(`${SUNUCU}/yukle`, { method: "POST", body: form });
-        if (!r.ok) throw new Error("Dosya sunucuya yüklenemedi");
+        await new Promise((resolve, reject) => {
+            task.on('state_changed',
+                snap => {
+                    const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 90 + 5);
+                    bar.style.width = pct + '%';
+                },
+                reject,
+                resolve
+            );
+        });
 
         bar.style.width = "100%";
-        const veri = await r.json();
-        return veri; // { url, ad }
+        const url = await ref.getDownloadURL();
+        return { url, ad: dosya.name };
     }
 
     // ── Kaydet ───────────────────────────────────────────────
@@ -1107,16 +1097,28 @@
         liste.innerHTML = `<div class="grup-yuklenme"><div class="spinner" style="margin:0 auto;"></div></div>`;
         document.getElementById("seciliGrupSayisi").textContent = "";
 
-        try {
-            const r = await fetch(`${SUNUCU}/gruplar`, { signal: AbortSignal.timeout(8000) });
-            if (!r.ok) throw new Error("Sunucu hatası");
-            gruplar = await r.json();
+        if (!wpHazir) {
+            liste.innerHTML = `<div class="grup-yuklenme">WhatsApp bağlı değil — önce QR okutun</div>`;
+            return;
+        }
 
-            if (gruplar.length === 0) {
-                liste.innerHTML = `<div class="grup-yuklenme">Hiç grup bulunamadı</div>`;
+        try {
+            const snap = await db.collection("gruplar").doc("liste").get();
+            const veri = snap.data();
+
+            if (!veri?.items?.length) {
+                // Sunucudan yenile iste
+                await db.collection("isler").add({
+                    tur: 'gruplar_yenile',
+                    durum: 'bekliyor',
+                    olusturma: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                liste.innerHTML = `<div class="grup-yuklenme"><div class="spinner" style="margin:0 auto;"></div><span style="display:block;margin-top:8px;font-size:13px;color:#8e8e93;">Gruplar yükleniyor...</span></div>`;
+                setTimeout(gruplariYukle, 3500);
                 return;
             }
 
+            gruplar = veri.items;
             liste.innerHTML = gruplar.map(g => `
                 <div class="grup-item" id="grupItem_${g.id.replace(/[^a-z0-9]/gi,'_')}" onclick="grupToggle('${g.id}')">
                     <input type="checkbox" id="chk_${g.id}">
@@ -1126,10 +1128,7 @@
                 </div>`).join("");
 
         } catch(e) {
-            liste.innerHTML = `
-                <div class="grup-yuklenme" style="color:#ff3b30;">
-                    ${wpHazir ? "Gruplar yüklenemedi: " + e.message : "WhatsApp bağlı değil — önce QR okutun"}
-                </div>`;
+            liste.innerHTML = `<div class="grup-yuklenme" style="color:#ff3b30;">Gruplar yüklenemedi: ${e.message}</div>`;
         }
     }
 
@@ -1178,94 +1177,83 @@
         const btn = document.getElementById("btnGonder");
         btn.disabled    = true;
         btn.textContent = `Gönderiliyor... (0/${seciliGrupIdler.length})`;
-
         document.getElementById("gonderimSonucAlani").style.display = "none";
 
         try {
-            const r = await fetch(`${SUNUCU}/gonder`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    grupIdler: seciliGrupIdler,
-                    mesaj:     item.mesaj || item.baslik,
-                    dosyaUrl:  item.dosyaUrl || null
-                }),
-                signal: AbortSignal.timeout(120000)
+            // Firestore'a iş yaz — HTTP yok, mixed content yok
+            const isRef = await db.collection("isler").add({
+                tur:       'gonder',
+                grupIdler: seciliGrupIdler,
+                mesaj:     item.mesaj || item.baslik,
+                dosyaUrl:  item.dosyaUrl  || null,
+                dosyaAdi:  item.dosyaAdi  || null,
+                durum:     'bekliyor',
+                ilerleme:  0,
+                toplam:    seciliGrupIdler.length,
+                olusturma: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            const sonuc = await r.json();
+            // İşin tamamlanmasını dinle
+            const unsubscribe = isRef.onSnapshot(snap => {
+                const is = snap.data();
+                if (!is) return;
 
-            if (!r.ok) throw new Error(sonuc.hata || "Sunucu hatası");
+                if (is.durum === 'bekliyor' || is.durum === 'isleniyor') {
+                    btn.textContent = `Gönderiliyor... (${is.ilerleme || 0}/${seciliGrupIdler.length})`;
+                }
 
-            // Sonucu göster
-            const basarili = sonuc.sonuclar.filter(s => s.basari).length;
-            const hatali   = sonuc.sonuclar.filter(s => !s.basari).length;
+                if (is.durum === 'tamamlandi') {
+                    unsubscribe();
+                    isRef.delete().catch(() => {});
+                    btn.disabled = false;
+                    if (is.basarili > 0) {
+                        db.collection("animsaticilar").doc(aktifGonderimId).update({ tamamlandi: true });
+                        modalKapat('gonderOverlay');
+                    } else {
+                        btn.textContent = "⚠️ Gönderilemedi";
+                        document.getElementById("gonderimSonucIcerik").innerHTML =
+                            `<div style="font-weight:800;margin-bottom:10px;">0/${is.toplam} grup başarılı</div>`;
+                        document.getElementById("gonderimSonucAlani").style.display = "block";
+                    }
+                }
 
-            const satirlar = sonuc.sonuclar.map(s => {
-                const ad = gruplar.find(g => g.id === s.grupId)?.ad || s.grupId;
-                return `<div class="gonderim-satir">
-                    <span>${guvenliFirat(ad)}</span>
-                    <span class="${s.basari ? 'basari-tag' : 'hata-tag'}">${s.basari ? "✓ Gönderildi" : "✗ Hata"}</span>
-                </div>`;
-            }).join("");
+                if (is.durum === 'hata') {
+                    unsubscribe();
+                    isRef.delete().catch(() => {});
+                    btn.disabled    = false;
+                    btn.textContent = "Hata oluştu";
+                    alert("Gönderim hatası: " + (is.hata || "Bilinmeyen hata"));
+                }
+            });
 
-            // En az bir grup başarılıysa görevi tamamlandı işaretle ve kapat
-            if (basarili > 0) {
-                await db.collection("animsaticilar").doc(aktifGonderimId).update({ tamamlandi: true });
-                modalKapat('gonderOverlay');
-                return;
-            }
-
-            // Tüm gruplar hata verdiyse sonucu göster
-            document.getElementById("gonderimSonucIcerik").innerHTML =
-                `<div style="font-weight:800;margin-bottom:10px;">
-                    ${basarili}/${sonuc.toplam} grup başarılı
-                </div>${satirlar}`;
-            document.getElementById("gonderimSonucAlani").style.display = "block";
-            btn.textContent = "⚠️ Gönderilemedi";
         } catch(e) {
+            btn.disabled    = false;
             btn.textContent = "Hata oluştu";
             alert("Gönderim hatası: " + e.message);
-        } finally {
-            btn.disabled = false;
         }
     }
 
     // ── Ayarlar ───────────────────────────────────────────────
     function ayarModalAc() {
-        const kayitli = localStorage.getItem('sunucuUrl') || '';
-        document.getElementById('inputSunucuUrl').value = kayitli;
-        document.getElementById('ayarDurumMetin').textContent = 'Bağlantı kontrol ediliyor...';
         modalAcGoster('ayarOverlay');
-
-        const kontrol = kayitli || 'http://localhost:3001';
-        fetch(`${kontrol}/durum`, { signal: AbortSignal.timeout(4000) })
-            .then(r => r.json())
-            .then(v => {
-                const durum = document.getElementById('ayarDurumMetin');
-                if (v.hazir) {
-                    durum.innerHTML = '<span style="color:#34c759;font-weight:700;">✅ Sunucuya bağlandı — WhatsApp aktif</span>';
-                } else if (v.qr) {
-                    durum.innerHTML = '<span style="color:#ff9500;font-weight:700;">📱 Sunucu çalışıyor — QR bekleniyor</span>';
-                } else {
-                    durum.innerHTML = '<span style="color:#ff9500;font-weight:700;">⏳ Sunucu çalışıyor — WhatsApp bağlanıyor</span>';
-                }
-            })
-            .catch(() => {
-                document.getElementById('ayarDurumMetin').innerHTML =
-                    '<span style="color:#ff3b30;font-weight:700;">❌ Sunucuya ulaşılamıyor</span>';
-            });
+        const durum = document.getElementById('ayarDurumMetin');
+        durum.textContent = 'Kontrol ediliyor...';
+        db.collection("durum").doc("whatsapp").get().then(snap => {
+            const v = snap.data() || {};
+            if (v.hazir) {
+                durum.innerHTML = '<span style="color:#34c759;font-weight:700;">✅ WhatsApp aktif</span>';
+            } else if (v.qr) {
+                durum.innerHTML = '<span style="color:#ff9500;font-weight:700;">📱 QR bekleniyor</span>';
+            } else {
+                durum.innerHTML = '<span style="color:#ff9500;font-weight:700;">⏳ Sunucu bağlanıyor...</span>';
+            }
+        }).catch(() => {
+            durum.innerHTML = '<span style="color:#ff3b30;font-weight:700;">❌ Firebase bağlantı hatası</span>';
+        });
     }
 
     function ayarKaydet() {
-        const url = document.getElementById('inputSunucuUrl').value.trim().replace(/\/$/, '');
-        if (url) {
-            localStorage.setItem('sunucuUrl', url);
-        } else {
-            localStorage.removeItem('sunucuUrl');
-        }
         modalKapat('ayarOverlay');
-        location.reload();
     }
 
     // ── Modal Yönetimi ────────────────────────────────────────
@@ -1280,7 +1268,10 @@
 
     function modalKapat(id) {
         document.getElementById(id).classList.remove("acik");
-        if (id === 'qrOverlay') clearInterval(window._qrInterval);
+        if (id === 'qrOverlay' && window._qrUnsubscribe) {
+            window._qrUnsubscribe();
+            window._qrUnsubscribe = null;
+        }
     }
 
     function overlayTikla(e, id) {

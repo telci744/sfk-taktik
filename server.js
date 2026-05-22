@@ -1,152 +1,243 @@
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
-const express  = require('express');
-const cors     = require('cors');
-const qrcode   = require('qrcode');
-const multer   = require('multer');
-const path     = require('path');
-const fs       = require('fs');
-const mime     = require('mime-types');
-const pino     = require('pino');
+const express = require('express');
+const cors    = require('cors');
+const qrcode  = require('qrcode');
+const path    = require('path');
+const fs      = require('fs');
+const pino    = require('pino');
 
-const PORT       = process.env.PORT || 3001;
-const SUNUCU_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
+const PORT             = process.env.PORT || 3001;
+const FIREBASE_PROJECT = 'sfk-taktik';
+const FIREBASE_API_KEY = 'AIzaSyD_zEbZek8IyacdHojnBpb4cWTIvBSdOtk';
+const FS_BASE          = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents`;
 
 const app = express();
 app.use(cors({ origin: '*' }));
-app.use(express.json({ limit: '100mb' }));
-
-const uploadsDir = path.join(__dirname, 'uploads');
-const authDir    = path.join(__dirname, 'auth_info');
-[uploadsDir, authDir].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
-
-app.use('/uploads', express.static(uploadsDir));
+app.use(express.json());
 app.use(express.static(__dirname, { index: 'index.html' }));
 
-const upload = multer({ dest: uploadsDir, limits: { fileSize: 50 * 1024 * 1024 } });
+const authDir = path.join(__dirname, 'auth_info');
+if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
 
-let qrData = null;
-let hazir  = false;
-let sock   = null;
+// ── Firestore REST yardımcıları ────────────────────────────────
+
+function toFS(val) {
+    if (val === null || val === undefined) return { nullValue: null };
+    if (typeof val === 'boolean')          return { booleanValue: val };
+    if (typeof val === 'number')           return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+    if (typeof val === 'string')           return { stringValue: val };
+    if (Array.isArray(val))                return { arrayValue: { values: val.map(toFS) } };
+    if (typeof val === 'object')           return { mapValue: { fields: objToFields(val) } };
+    return { stringValue: String(val) };
+}
+
+function objToFields(obj) {
+    const f = {};
+    for (const [k, v] of Object.entries(obj)) f[k] = toFS(v);
+    return f;
+}
+
+function fromFS(val) {
+    if (!val) return null;
+    if ('nullValue'    in val) return null;
+    if ('booleanValue' in val) return val.booleanValue;
+    if ('integerValue' in val) return Number(val.integerValue);
+    if ('doubleValue'  in val) return val.doubleValue;
+    if ('stringValue'  in val) return val.stringValue;
+    if ('arrayValue'   in val) return (val.arrayValue.values || []).map(fromFS);
+    if ('mapValue'     in val) return fieldsToObj(val.mapValue.fields || {});
+    return null;
+}
+
+function fieldsToObj(fields) {
+    const obj = {};
+    for (const [k, v] of Object.entries(fields)) obj[k] = fromFS(v);
+    return obj;
+}
+
+async function fsSet(col, doc, data) {
+    const r = await fetch(`${FS_BASE}/${col}/${doc}?key=${FIREBASE_API_KEY}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: objToFields(data) })
+    });
+    if (!r.ok) throw new Error(await r.text());
+}
+
+async function fsUpdate(col, doc, data) {
+    const mask = Object.keys(data).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+    const r = await fetch(`${FS_BASE}/${col}/${doc}?key=${FIREBASE_API_KEY}&${mask}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: objToFields(data) })
+    });
+    if (!r.ok) throw new Error(await r.text());
+}
+
+async function fsDelete(col, doc) {
+    await fetch(`${FS_BASE}/${col}/${doc}?key=${FIREBASE_API_KEY}`, { method: 'DELETE' });
+}
+
+async function fsQuery(col, field, op, value) {
+    const fsVal = typeof value === 'boolean' ? { booleanValue: value } : { stringValue: value };
+    const r = await fetch(`${FS_BASE}:runQuery?key=${FIREBASE_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            structuredQuery: {
+                from: [{ collectionId: col }],
+                where: { fieldFilter: { field: { fieldPath: field }, op, value: fsVal } },
+                limit: 5
+            }
+        })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const rows = await r.json();
+    return rows
+        .filter(x => x.document)
+        .map(x => ({ _id: x.document.name.split('/').pop(), ...fieldsToObj(x.document.fields) }));
+}
+
+// ── WhatsApp ───────────────────────────────────────────────────
+
+let hazir = false;
+let sock  = null;
 
 async function baslat() {
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
-    const { version } = await fetchLatestBaileysVersion();
+    const { version }          = await fetchLatestBaileysVersion();
 
     sock = makeWASocket({
         version,
-        auth:  state,
+        auth:   state,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: false,
-        browser: ['Ubuntu', 'Chrome', '22.04'],
+        printQRInTerminal:            false,
+        browser:                      ['Ubuntu', 'Chrome', '22.04'],
         generateHighQualityLinkPreview: false,
-        connectTimeoutMs: 30000,
-        keepAliveIntervalMs: 10000
+        connectTimeoutMs:             30000,
+        keepAliveIntervalMs:          10000
     });
 
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-            qrData = await qrcode.toDataURL(qr);
-            hazir  = false;
+            const qrData = await qrcode.toDataURL(qr);
+            hazir = false;
+            fsUpdate('durum', 'whatsapp', { hazir: false, qr: qrData, ts: Date.now() }).catch(() => {});
             console.log('📱 QR kodu oluşturuldu');
         }
 
         if (connection === 'close') {
-            hazir  = false;
-            qrData = null;
+            hazir = false;
             const statusCode   = lastDisconnect?.error?.output?.statusCode;
             const cikisYapildi = statusCode === DisconnectReason.loggedOut;
             console.log('🔴 Bağlantı kesildi:', statusCode);
-            // 405 = multidevice sorunu, auth sil ve yeniden dene
+            fsUpdate('durum', 'whatsapp', { hazir: false, qr: null, ts: Date.now() }).catch(() => {});
             if (statusCode === 405) {
                 fs.rmSync(authDir, { recursive: true, force: true });
                 fs.mkdirSync(authDir, { recursive: true });
-                console.log('🔄 Auth temizlendi, QR yeniden oluşturulacak');
+                console.log('🔄 Auth temizlendi');
             }
             if (!cikisYapildi) setTimeout(baslat, 5000);
             else baslat();
         }
 
         if (connection === 'open') {
-            hazir  = true;
-            qrData = null;
+            hazir = true;
+            fsUpdate('durum', 'whatsapp', { hazir: true, qr: null, ts: Date.now() }).catch(() => {});
             console.log('🟢 WhatsApp bağlandı!');
+            gruplarYaz().catch(() => {});
         }
     });
 
     sock.ev.on('creds.update', saveCreds);
 }
 
+async function gruplarYaz() {
+    const veri    = await sock.groupFetchAllParticipating();
+    const gruplar = Object.values(veri)
+        .map(g => ({ id: g.id, ad: g.subject, uyeSayisi: g.participants?.length || 0 }))
+        .sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+    await fsSet('gruplar', 'liste', { items: gruplar, ts: Date.now() });
+    console.log(`📋 ${gruplar.length} grup Firestore'a yazıldı`);
+}
+
+// ── İş kuyruğu ────────────────────────────────────────────────
+
+let isleniyor = false;
+
+async function isKontrol() {
+    if (!hazir || isleniyor) return;
+
+    let isler;
+    try {
+        isler = await fsQuery('isler', 'durum', 'EQUAL', 'bekliyor');
+    } catch { return; }
+
+    for (const is of isler) {
+        // Grupları yenile isteği
+        if (is.tur === 'gruplar_yenile') {
+            await fsDelete('isler', is._id);
+            gruplarYaz().catch(() => {});
+            continue;
+        }
+
+        // Mesaj gönderme işi
+        if (is.tur !== 'gonder') continue;
+
+        isleniyor = true;
+        try {
+            await fsUpdate('isler', is._id, { durum: 'isleniyor' });
+
+            const { grupIdler, mesaj, dosyaUrl, dosyaAdi } = is;
+            const sonuclar = [];
+
+            for (let i = 0; i < grupIdler.length; i++) {
+                const grupId = grupIdler[i];
+                try {
+                    if (dosyaUrl) {
+                        const resp        = await fetch(dosyaUrl);
+                        const arrayBuffer = await resp.arrayBuffer();
+                        const buffer      = Buffer.from(arrayBuffer);
+                        const ct          = resp.headers.get('content-type') || 'application/octet-stream';
+                        const mimeType    = ct.split(';')[0].trim();
+
+                        const icerik = mimeType.startsWith('image/')
+                            ? { image: buffer, caption: mesaj || '', mimetype: mimeType }
+                            : { document: buffer, mimetype: mimeType, fileName: dosyaAdi || 'dosya', caption: mesaj || '' };
+
+                        await sock.sendMessage(grupId, icerik);
+                    } else {
+                        await sock.sendMessage(grupId, { text: mesaj });
+                    }
+                    sonuclar.push({ grupId, basari: true });
+                    console.log(`  ✅ → ${grupId}`);
+                } catch (e) {
+                    sonuclar.push({ grupId, basari: false, hata: e.message });
+                    console.log(`  ❌ (${grupId}):`, e.message);
+                }
+
+                await fsUpdate('isler', is._id, { ilerleme: i + 1 }).catch(() => {});
+
+                if (i < grupIdler.length - 1) await new Promise(r => setTimeout(r, 4000));
+            }
+
+            const basarili = sonuclar.filter(s => s.basari).length;
+            console.log(`📊 ${basarili}/${grupIdler.length}`);
+            await fsUpdate('isler', is._id, { durum: 'tamamlandi', basarili, toplam: grupIdler.length });
+        } catch (e) {
+            console.error('İş hatası:', e.message);
+            await fsUpdate('isler', is._id, { durum: 'hata', hata: e.message }).catch(() => {});
+        } finally {
+            isleniyor = false;
+        }
+    }
+}
+
+setInterval(isKontrol, 3000);
+
 console.log('⏳ WhatsApp başlatılıyor...');
 baslat().catch(console.error);
 
-// ── Endpoints ─────────────────────────────────────────────────
-
-app.get('/durum', (req, res) => res.json({ hazir, qr: qrData }));
-
-app.get('/gruplar', async (req, res) => {
-    if (!hazir) return res.status(503).json({ hata: 'WhatsApp bağlı değil' });
-    try {
-        const veri    = await sock.groupFetchAllParticipating();
-        const gruplar = Object.values(veri)
-            .map(g => ({ id: g.id, ad: g.subject, uyeSayisi: g.participants?.length || 0 }))
-            .sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
-        res.json(gruplar);
-    } catch (e) {
-        res.status(500).json({ hata: e.message });
-    }
-});
-
-app.post('/gonder', async (req, res) => {
-    if (!hazir) return res.status(503).json({ hata: 'WhatsApp bağlı değil' });
-
-    const { grupIdler, mesaj, dosyaUrl, dosyaAdi } = req.body;
-    if (!grupIdler?.length)    return res.status(400).json({ hata: 'En az bir grup seçilmeli' });
-    if (!mesaj && !dosyaUrl)   return res.status(400).json({ hata: 'Mesaj veya dosya gerekli' });
-
-    const sonuclar = [];
-
-    for (let i = 0; i < grupIdler.length; i++) {
-        const grupId = grupIdler[i];
-        try {
-            if (dosyaUrl) {
-                const dosyaAdiUrl = path.basename(new URL(dosyaUrl).pathname);
-                const tamYol      = path.join(uploadsDir, dosyaAdiUrl);
-                const buffer      = fs.readFileSync(tamYol);
-                const mimeType    = mime.lookup(tamYol) || 'application/octet-stream';
-                const goruntulAd  = dosyaAdi || dosyaAdiUrl;
-
-                const icerik = mimeType.startsWith('image/')
-                    ? { image: buffer, caption: mesaj || '', mimetype: mimeType }
-                    : { document: buffer, mimetype: mimeType, fileName: goruntulAd, caption: mesaj || '' };
-
-                await sock.sendMessage(grupId, icerik);
-            } else {
-                await sock.sendMessage(grupId, { text: mesaj });
-            }
-            sonuclar.push({ grupId, basari: true });
-            console.log(`  ✅ Gönderildi → ${grupId}`);
-        } catch (e) {
-            sonuclar.push({ grupId, basari: false, hata: e.message });
-            console.log(`  ❌ Hata (${grupId}):`, e.message);
-        }
-        if (i < grupIdler.length - 1) await new Promise(r => setTimeout(r, 4000));
-    }
-
-    const basarili = sonuclar.filter(s => s.basari).length;
-    console.log(`📊 Gönderim: ${basarili}/${grupIdler.length}`);
-    res.json({ sonuclar, basarili, toplam: grupIdler.length });
-});
-
-app.post('/yukle', upload.single('dosya'), (req, res) => {
-    if (!req.file) return res.status(400).json({ hata: 'Dosya bulunamadı' });
-    const orijinalAd = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
-    const uzanti     = path.extname(orijinalAd);
-    const yeniAd     = req.file.filename + uzanti;
-    fs.renameSync(req.file.path, path.join(uploadsDir, yeniAd));
-    console.log(`📁 Yüklendi: ${orijinalAd}`);
-    res.json({ url: `${SUNUCU_URL}/uploads/${yeniAd}`, ad: orijinalAd });
-});
-
-app.listen(PORT, () => console.log(`\n🚀 Sunucu hazır → ${SUNUCU_URL}\n`));
+app.listen(PORT, () => console.log(`\n🚀 Sunucu hazır → http://localhost:${PORT}\n`));
