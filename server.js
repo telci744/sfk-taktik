@@ -1,15 +1,20 @@
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
-const express = require('express');
-const cors    = require('cors');
-const qrcode  = require('qrcode');
-const path    = require('path');
-const fs      = require('fs');
-const pino    = require('pino');
+const express  = require('express');
+const cors     = require('cors');
+const qrcode   = require('qrcode');
+const path     = require('path');
+const fs       = require('fs');
+const pino     = require('pino');
+const webpush  = require('web-push');
 
 const PORT             = process.env.PORT || 3001;
 const FIREBASE_PROJECT = 'sfk-taktik';
 const FIREBASE_API_KEY = 'AIzaSyD_zEbZek8IyacdHojnBpb4cWTIvBSdOtk';
 const FS_BASE          = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents`;
+
+const VAPID_PUBLIC  = 'BMf7FqKbLe6QrIL7PonKODsM7DgGRoANWRgNS41PwWsGPFsDffL8Mq-siQUlYtv0RbJwr88VrD2CuySkMLhBkDs';
+const VAPID_PRIVATE = 'EJmg0lOVdbhdXIb7Vu1fiwfvTCxPKZRgglCQleBGUKA';
+webpush.setVapidDetails('mailto:sfk@mavikonak.app', VAPID_PUBLIC, VAPID_PRIVATE);
 
 const app = express();
 app.use(cors({ origin: '*' }));
@@ -113,6 +118,30 @@ async function fsDelete(col, doc) {
     await fetch(`${FS_BASE}/${col}/${doc}?key=${FIREBASE_API_KEY}`, { method: 'DELETE' });
 }
 
+// ── Web Push bildirimleri ─────────────────────────────────────
+async function bildirimGonder(baslik, mesaj) {
+    try {
+        const ayarlar = await fsGet('ayarlar', 'push');
+        if (!ayarlar?.endpoint) return;
+        const sub = { endpoint: ayarlar.endpoint, keys: { p256dh: ayarlar.p256dh, auth: ayarlar.auth } };
+        await webpush.sendNotification(sub, JSON.stringify({ baslik, mesaj }));
+        console.log(`🔔 Bildirim: ${baslik}`);
+    } catch(e) {
+        if (!e.message?.includes('410') && !e.message?.includes('404')) {
+            console.error('Bildirim hatası:', e.message);
+        }
+    }
+}
+
+// Günlük istatistik sayacı
+let gunStats = { gun: '', gonderilenler: 0, hatalar: 0 };
+function gunIstatistikGuncelle(basarili, hatali) {
+    const bugun = new Date().toISOString().split('T')[0];
+    if (gunStats.gun !== bugun) gunStats = { gun: bugun, gonderilenler: 0, hatalar: 0 };
+    gunStats.gonderilenler += basarili;
+    gunStats.hatalar       += hatali;
+}
+
 async function dosyaBufferOku(dosyaId) {
     const meta = await fsGet('dosyalar', dosyaId);
     const parcaSayisi = meta.parcaSayisi || 1;
@@ -180,6 +209,7 @@ async function baslat() {
             const cikisYapildi = statusCode === DisconnectReason.loggedOut;
             console.log('🔴 Bağlantı kesildi:', statusCode);
             fsUpdate('durum', 'whatsapp', { hazir: false, qr: null, ts: Date.now() }).catch(() => {});
+            bildirimGonder('⚠️ WhatsApp Bağlantısı Koptu', 'Mavikonak sunucusu WhatsApp\'tan ayrıldı. Kontrol edin.').catch(() => {});
             if (statusCode === 405) {
                 fs.rmSync(authDir, { recursive: true, force: true });
                 fs.mkdirSync(authDir, { recursive: true });
@@ -275,10 +305,19 @@ async function isKontrol() {
             }
 
             const basarili = sonuclar.filter(s => s.basari).length;
+            const hatali   = grupIdler.length - basarili;
             console.log(`📊 ${basarili}/${grupIdler.length}`);
             await fsUpdate('isler', is._id, { durum: 'tamamlandi', basarili, toplam: grupIdler.length });
             if (basarili > 0 && is.animsaticiId) {
                 await fsUpdate('animsaticilar', is.animsaticiId, { tamamlandi: true }).catch(() => {});
+            }
+            gunIstatistikGuncelle(basarili, hatali);
+            if (basarili > 0 && hatali === 0) {
+                bildirimGonder('✅ Gönderim Tamamlandı', `${basarili} gruba başarıyla gönderildi.`).catch(() => {});
+            } else if (basarili > 0) {
+                bildirimGonder('⚠️ Kısmi Gönderim', `${basarili} başarılı, ${hatali} başarısız.`).catch(() => {});
+            } else {
+                bildirimGonder('❌ Gönderim Başarısız', `${grupIdler.length} gruptan hiçbirine gönderilemedi.`).catch(() => {});
             }
         } catch (e) {
             console.error('İş hatası:', e.message);
@@ -328,6 +367,23 @@ async function zamanlıGonderimKontrol() {
 }
 
 setInterval(zamanlıGonderimKontrol, 30000);
+
+// ── 23:00 Günlük özet ─────────────────────────────────────────
+let ozetGonderildiGun = '';
+setInterval(() => {
+    const simdi  = new Date();
+    const bugun  = simdi.toISOString().split('T')[0];
+    const sa     = simdi.getHours();
+    const dk     = simdi.getMinutes();
+    if (sa === 23 && dk < 1 && ozetGonderildiGun !== bugun) {
+        ozetGonderildiGun = bugun;
+        const { gonderilenler, hatalar } = gunStats;
+        const mesaj = gonderilenler > 0
+            ? `Bugün ${gonderilenler} mesaj gönderildi${hatalar > 0 ? `, ${hatalar} hata oluştu` : ''}.`
+            : 'Bugün hiç mesaj gönderilmedi.';
+        bildirimGonder('📊 Günlük Özet', mesaj).catch(() => {});
+    }
+}, 30000);
 
 console.log('⏳ WhatsApp başlatılıyor...');
 baslat().catch(console.error);

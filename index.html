@@ -1241,6 +1241,38 @@
     dbHazir = true;
     kilitBaslat();
 
+    // ── Web Push bildirimleri ─────────────────────────────────
+    const VAPID_PUBLIC = 'BMf7FqKbLe6QrIL7PonKODsM7DgGRoANWRgNS41PwWsGPFsDffL8Mq-siQUlYtv0RbJwr88VrD2CuySkMLhBkDs';
+
+    async function pushAbonelikKur() {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+        try {
+            const reg  = await navigator.serviceWorker.register('/sw.js');
+            const izin = await Notification.requestPermission();
+            if (izin !== 'granted') return;
+            const sub = await reg.pushManager.subscribe({
+                userVisibleOnly:      true,
+                applicationServerKey: VAPID_PUBLIC
+            });
+            const j = sub.toJSON();
+            await db.collection('ayarlar').doc('push').set({
+                endpoint: j.endpoint,
+                p256dh:   j.keys.p256dh,
+                auth:     j.keys.auth
+            });
+            console.log('🔔 Push bildirimleri aktif');
+        } catch(e) {
+            console.warn('Push kurulamadı:', e.message);
+        }
+    }
+
+    // Kullanıcı giriş yaptıktan sonra push kur
+    const _asılKilitAc = kilitAc;
+    kilitAc = function() {
+        _asılKilitAc();
+        setTimeout(pushAbonelikKur, 1000);
+    };
+
     // ── Sabitler & Durum ──────────────────────────────────────
     let tumVeri           = [];
     let aktifFiltre       = "tumu";
