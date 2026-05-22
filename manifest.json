@@ -1,0 +1,15 @@
+{
+  "name": "Bilgi İşlem",
+  "short_name": "Bilgi İşlem",
+  "description": "Mavikent Öğrenci Yurdu Bilgi İşlem Sistemi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2f2f7",
+  "theme_color": "#0a2d6e",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/logo.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/logo.png", "sizes": "any",     "type": "image/png", "purpose": "maskable" }
+  ]
+}

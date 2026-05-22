@@ -3,7 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Anımsatıcılar</title>
+    <title>Bilgi İşlem</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="apple-touch-icon" href="/logo.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a2d6e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Bilgi İşlem">
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -728,9 +735,9 @@
 <body>
 <!-- ── Kilit Ekranı ── -->
 <div id="kilitEkran">
-    <div class="kilit-logo">🔒</div>
-    <div class="kilit-baslik">Mavikonak</div>
-    <div class="kilit-alt" id="kilitAlt">Güvenli giriş</div>
+    <img src="/logo.png" style="width:110px;height:110px;border-radius:50%;object-fit:cover;margin-bottom:12px;box-shadow:0 4px 20px rgba(10,45,110,.2);">
+    <div class="kilit-baslik">Bilgi İşlem</div>
+    <div class="kilit-alt" id="kilitAlt">Mavikent Öğrenci Yurdu</div>
 
     <!-- Adım göstergesi -->
     <div class="kilit-adim" id="kilitAdim" style="display:none;">
@@ -765,7 +772,7 @@
             <div style="margin-top:12px;border-top:1px solid #e5e5ea;padding-top:12px;">
                 <p style="font-size:11px;color:#8e8e93;margin-bottom:6px;">veya <b>Elle Gir</b> → bu kodu aynen yaz (boşluksuz):</p>
                 <div id="totpManuelKod" onclick="this.style.background='#e5f0ff'" style="font-family:monospace;font-size:16px;font-weight:700;color:#007aff;letter-spacing:3px;padding:8px;background:#f2f2f7;border-radius:8px;cursor:pointer;"></div>
-                <p style="font-size:10px;color:#8e8e93;margin-top:6px;">Hesap adı: <b>Mavikonak</b> &nbsp;|&nbsp; Tür: <b>Zamana dayalı</b></p>
+                <p style="font-size:10px;color:#8e8e93;margin-top:6px;">Hesap adı: <b>Bilgi İşlem</b> &nbsp;|&nbsp; Tür: <b>Zamana dayalı</b></p>
             </div>
         </div>
         <input type="tel" class="auth-input" id="qrDogrulaInput"
@@ -805,7 +812,7 @@
     <!-- Header -->
     <div class="header">
         <div class="header-top">
-            <h1>Anımsatıcılar</h1>
+            <h1>Bilgi İşlem</h1>
             <div style="display:flex;align-items:center;gap:8px;">
                 <span class="header-sayac" id="sayac">0 öğe</span>
                 <button onclick="ayarModalAc()" style="background:#f2f2f7;border:none;width:32px;height:32px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">⚙️</button>
@@ -1203,7 +1210,7 @@
     }
 
     function qrKodCiz() {
-        const uri = `otpauth://totp/Mavikonak%20SFK?secret=${totpSecret}&issuer=Mavikonak`;
+        const uri = `otpauth://totp/Bilgi%20%C4%B0%C5%9Flem?secret=${totpSecret}&issuer=Mavikent`;
         const el  = document.getElementById('qrCanvas');
         el.innerHTML = '';
         try {
