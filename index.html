@@ -6,6 +6,7 @@
     <title>Anımsatıcılar</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
 
@@ -635,9 +636,159 @@
             display: inline-flex; align-items: center; gap: 3px;
             font-size: 11px; color: #ff9500; font-weight: 700;
         }
+
+        /* ── Kilit Ekranı ── */
+        #kilitEkran {
+            position: fixed; inset: 0; z-index: 9999;
+            background: #f2f2f7;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 40px 24px;
+            padding-top: max(40px, env(safe-area-inset-top));
+        }
+        .kilit-logo { font-size: 56px; margin-bottom: 12px; }
+        .kilit-baslik { font-size: 22px; font-weight: 800; color: #1c1c1e; margin-bottom: 4px; }
+        .kilit-alt    { font-size: 14px; color: #8e8e93; margin-bottom: 40px; text-align: center; }
+
+        .pin-daireler {
+            display: flex; gap: 16px; margin-bottom: 40px;
+        }
+        .pin-daire {
+            width: 16px; height: 16px; border-radius: 50%;
+            border: 2px solid #c7c7cc; transition: .2s;
+        }
+        .pin-daire.dolu { background: #1c1c1e; border-color: #1c1c1e; }
+        .pin-daire.hata { background: #ff3b30; border-color: #ff3b30; }
+        .pin-daire.ok   { background: #34c759; border-color: #34c759; }
+
+        .pin-klavye {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 12px; width: 260px;
+        }
+        .pin-tus {
+            height: 68px; border-radius: 16px;
+            border: none; background: white;
+            font-size: 22px; font-weight: 600; color: #1c1c1e;
+            cursor: pointer; transition: .15s;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+        }
+        .pin-tus:active { background: #e5e5ea; transform: scale(.95); }
+        .pin-tus.sil    { font-size: 18px; color: #8e8e93; }
+        .pin-tus.bos    { background: transparent; box-shadow: none; pointer-events: none; }
+
+        .kilit-adim {
+            font-size: 13px; color: #8e8e93; margin-bottom: 24px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .kilit-adim span {
+            background: #007aff; color: white;
+            width: 20px; height: 20px; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 700;
+        }
+
+        .kilit-hata {
+            color: #ff3b30; font-size: 13px; font-weight: 600;
+            margin-bottom: 12px; min-height: 20px; text-align: center;
+        }
+
+        .kilit-btn {
+            margin-top: 16px; padding: 14px 40px;
+            background: #007aff; color: white;
+            border: none; border-radius: 14px;
+            font-size: 16px; font-weight: 700; cursor: pointer;
+            width: 100%; max-width: 260px;
+        }
+        .kilit-btn:active { opacity: .8; }
+        .kilit-btn.ikincil {
+            background: transparent; color: #007aff;
+            border: 1.5px solid #007aff; margin-top: 8px;
+        }
+
+        .qr-setup-alan {
+            background: white; border-radius: 16px;
+            padding: 20px; text-align: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,.08);
+            margin-bottom: 20px;
+        }
+        .qr-setup-alan canvas { border-radius: 8px; }
+        .qr-setup-alan p { font-size: 12px; color: #8e8e93; margin-top: 10px; }
+
+        .auth-input {
+            width: 100%; max-width: 260px;
+            padding: 14px; text-align: center;
+            font-size: 24px; letter-spacing: 8px;
+            border: 2px solid #e5e5ea; border-radius: 14px;
+            background: white; color: #1c1c1e;
+            margin-bottom: 8px;
+        }
+        .auth-input:focus { outline: none; border-color: #007aff; }
     </style>
 </head>
 <body>
+<!-- ── Kilit Ekranı ── -->
+<div id="kilitEkran">
+    <div class="kilit-logo">🔒</div>
+    <div class="kilit-baslik">Mavikonak</div>
+    <div class="kilit-alt" id="kilitAlt">Güvenli giriş</div>
+
+    <!-- Adım göstergesi -->
+    <div class="kilit-adim" id="kilitAdim" style="display:none;">
+        <span id="kilitAdimNo">1</span>
+        <span id="kilitAdimMetin"></span>
+    </div>
+
+    <!-- Hata mesajı -->
+    <div class="kilit-hata" id="kilitHata"></div>
+
+    <!-- PIN daireleri -->
+    <div class="pin-daireler" id="pinDaireler">
+        <div class="pin-daire" id="pd0"></div>
+        <div class="pin-daire" id="pd1"></div>
+        <div class="pin-daire" id="pd2"></div>
+        <div class="pin-daire" id="pd3"></div>
+    </div>
+
+    <!-- Authenticator kod girişi -->
+    <div id="authGirisAlani" style="display:none;">
+        <input type="tel" class="auth-input" id="authKodInput"
+               maxlength="6" placeholder="------"
+               oninput="authKodGirildi(this)"
+               autocomplete="one-time-code">
+    </div>
+
+    <!-- QR kurulum alanı -->
+    <div id="qrKurulumAlani" style="display:none;">
+        <div class="qr-setup-alan">
+            <div id="qrCanvas" style="display:inline-block;"></div>
+            <p>Google Authenticator'ı açın ve QR kodu taratın</p>
+        </div>
+        <input type="tel" class="auth-input" id="qrDogrulaInput"
+               maxlength="6" placeholder="6 haneli kod"
+               autocomplete="one-time-code">
+    </div>
+
+    <!-- PIN klavyesi -->
+    <div class="pin-klavye" id="pinKlavye">
+        <button class="pin-tus" onclick="pinTus('1')">1</button>
+        <button class="pin-tus" onclick="pinTus('2')">2</button>
+        <button class="pin-tus" onclick="pinTus('3')">3</button>
+        <button class="pin-tus" onclick="pinTus('4')">4</button>
+        <button class="pin-tus" onclick="pinTus('5')">5</button>
+        <button class="pin-tus" onclick="pinTus('6')">6</button>
+        <button class="pin-tus" onclick="pinTus('7')">7</button>
+        <button class="pin-tus" onclick="pinTus('8')">8</button>
+        <button class="pin-tus" onclick="pinTus('9')">9</button>
+        <div class="pin-tus bos"></div>
+        <button class="pin-tus" onclick="pinTus('0')">0</button>
+        <button class="pin-tus sil" onclick="pinSil()">⌫</button>
+    </div>
+
+    <!-- Butonlar -->
+    <button class="kilit-btn" id="kilitBtn" style="display:none;" onclick="kilitBtnTikla()">Devam</button>
+    <button class="kilit-btn ikincil" id="kilitIkincilBtn" style="display:none;" onclick="kilitIkincilTikla()"></button>
+</div>
+
 <div class="app">
 
     <!-- WhatsApp Durum Çubuğu -->
@@ -828,6 +979,254 @@
 </div>
 
 <script>
+    // ══════════════════════════════════════════════════════════
+    // KİLİT / AUTH SİSTEMİ
+    // Aşama 1: 4 haneli PIN
+    // Aşama 2: Google Authenticator (TOTP)
+    // ══════════════════════════════════════════════════════════
+
+    // ── TOTP (RFC 6238) — saf WebCrypto, kütüphane yok ──────
+    function base32Decode(s) {
+        const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        let bits = 0, val = 0;
+        const out = [];
+        for (const c of s.replace(/=+$/, '').toUpperCase()) {
+            const idx = alpha.indexOf(c);
+            if (idx < 0) continue;
+            val = (val << 5) | idx; bits += 5;
+            if (bits >= 8) { bits -= 8; out.push((val >> bits) & 0xff); }
+        }
+        return new Uint8Array(out);
+    }
+
+    function randomBase32(len = 20) {
+        const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        const rnd   = crypto.getRandomValues(new Uint8Array(len));
+        return Array.from(rnd, b => alpha[b & 31]).join('');
+    }
+
+    async function totpKod(secret, step) {
+        const key = base32Decode(secret);
+        const msg = new Uint8Array(8);
+        let t = step;
+        for (let i = 7; i >= 0; i--) { msg[i] = t & 0xff; t = Math.floor(t / 256); }
+        const ck  = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+        const sig = new Uint8Array(await crypto.subtle.sign('HMAC', ck, msg));
+        const off = sig[19] & 0xf;
+        const code = ((sig[off] & 0x7f) << 24 | sig[off+1] << 16 | sig[off+2] << 8 | sig[off+3]) % 1000000;
+        return String(code).padStart(6, '0');
+    }
+
+    async function totpDogrula(secret, token) {
+        const step = Math.floor(Date.now() / 30000);
+        for (const s of [step - 1, step, step + 1]) {
+            if (await totpKod(secret, s) === token) return true;
+        }
+        return false;
+    }
+
+    async function pinHash(pin) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // ── Kilit Durumu ─────────────────────────────────────────
+    // 'kurulum_pin' | 'kurulum_pin_onay' | 'kurulum_qr' | 'giris_pin' | 'giris_auth' | 'acik'
+    let kilitDurum  = 'giris_pin';
+    let pinBuffer   = '';
+    let kurulumPin  = '';
+    let totpSecret  = '';
+    let dbHazir     = false; // Firebase init bekle
+
+    function kilitEkraniGoster(durum) {
+        kilitDurum = durum;
+        pinBuffer  = '';
+        pinGuncelle();
+        document.getElementById('kilitHata').textContent = '';
+
+        const adimEl   = document.getElementById('kilitAdim');
+        const adimNo   = document.getElementById('kilitAdimNo');
+        const adimMtn  = document.getElementById('kilitAdimMetin');
+        const alt      = document.getElementById('kilitAlt');
+        const pDaireler = document.getElementById('pinDaireler');
+        const pKlavye  = document.getElementById('pinKlavye');
+        const authAl   = document.getElementById('authGirisAlani');
+        const qrAl     = document.getElementById('qrKurulumAlani');
+        const btn      = document.getElementById('kilitBtn');
+        const btnI     = document.getElementById('kilitIkincilBtn');
+
+        // Hepsini sıfırla
+        [pDaireler, pKlavye, authAl, qrAl, adimEl, btn, btnI]
+            .forEach(el => el.style.display = 'none');
+
+        if (durum === 'kurulum_pin') {
+            alt.textContent      = 'İlk kurulum — güvenlik kodu belirle';
+            adimNo.textContent   = '1'; adimMtn.textContent = '4 haneli PIN oluştur';
+            adimEl.style.display = 'flex'; pDaireler.style.display = 'flex';
+            pKlavye.style.display = 'grid';
+
+        } else if (durum === 'kurulum_pin_onay') {
+            alt.textContent       = 'PIN\'i tekrar gir';
+            adimNo.textContent    = '1'; adimMtn.textContent = 'PIN\'i onayla';
+            adimEl.style.display  = 'flex'; pDaireler.style.display = 'flex';
+            pKlavye.style.display = 'grid';
+
+        } else if (durum === 'kurulum_qr') {
+            alt.textContent           = 'Google Authenticator\'ı kur';
+            adimNo.textContent        = '2'; adimMtn.textContent = 'QR kodu tara ve kodu gir';
+            adimEl.style.display      = 'flex'; qrAl.style.display = 'block';
+            btn.style.display         = 'block'; btn.textContent = 'Doğrula ve Başla';
+            btnI.style.display        = 'block'; btnI.textContent = 'Geri';
+            qrKodCiz();
+
+        } else if (durum === 'giris_pin') {
+            alt.textContent       = 'PIN kodunu gir';
+            adimNo.textContent    = '1'; adimMtn.textContent = 'PIN';
+            adimEl.style.display  = 'flex'; pDaireler.style.display = 'flex';
+            pKlavye.style.display = 'grid';
+
+        } else if (durum === 'giris_auth') {
+            alt.textContent          = 'Google Authenticator kodunu gir';
+            adimNo.textContent       = '2'; adimMtn.textContent = 'Authenticator';
+            adimEl.style.display     = 'flex'; authAl.style.display = 'block';
+            document.getElementById('authKodInput').value = '';
+            setTimeout(() => document.getElementById('authKodInput').focus(), 300);
+        }
+    }
+
+    function pinTus(sayi) {
+        if (pinBuffer.length >= 4) return;
+        pinBuffer += sayi;
+        pinGuncelle();
+        if (pinBuffer.length === 4) setTimeout(pinTamamlandi, 150);
+    }
+
+    function pinSil() {
+        pinBuffer = pinBuffer.slice(0, -1);
+        pinGuncelle();
+    }
+
+    function pinGuncelle() {
+        for (let i = 0; i < 4; i++) {
+            const d = document.getElementById(`pd${i}`);
+            if (!d) continue;
+            d.className = 'pin-daire' + (i < pinBuffer.length ? ' dolu' : '');
+        }
+    }
+
+    function pinHata() {
+        for (let i = 0; i < 4; i++) {
+            const d = document.getElementById(`pd${i}`);
+            if (d) d.className = 'pin-daire hata';
+        }
+        setTimeout(() => { pinBuffer = ''; pinGuncelle(); }, 600);
+    }
+
+    async function pinTamamlandi() {
+        if (kilitDurum === 'kurulum_pin') {
+            kurulumPin = pinBuffer;
+            kilitEkraniGoster('kurulum_pin_onay');
+
+        } else if (kilitDurum === 'kurulum_pin_onay') {
+            if (pinBuffer !== kurulumPin) {
+                pinHata();
+                document.getElementById('kilitHata').textContent = 'PIN\'ler eşleşmiyor, tekrar dene';
+                return;
+            }
+            // PIN doğru — QR kurulumuna geç
+            totpSecret = randomBase32();
+            kilitEkraniGoster('kurulum_qr');
+
+        } else if (kilitDurum === 'giris_pin') {
+            const girilenHash = await pinHash(pinBuffer);
+            let ayarlar;
+            try { ayarlar = await db.collection('ayarlar').doc('guvenlik').get(); }
+            catch { pinHata(); return; }
+            const kayitli = ayarlar.data();
+            if (!kayitli || girilenHash !== kayitli.pinHash) {
+                pinHata();
+                document.getElementById('kilitHata').textContent = 'Yanlış PIN';
+                return;
+            }
+            totpSecret = kayitli.totpSecret;
+            kilitEkraniGoster('giris_auth');
+        }
+    }
+
+    function authKodGirildi(input) {
+        if (input.value.length === 6) setTimeout(() => authKodDogrula(input.value), 100);
+    }
+
+    async function authKodDogrula(kod) {
+        const tamam = await totpDogrula(totpSecret, kod.trim());
+        if (tamam) {
+            kilitAc();
+        } else {
+            document.getElementById('authKodInput').value = '';
+            document.getElementById('kilitHata').textContent = 'Yanlış kod, tekrar dene';
+        }
+    }
+
+    function kilitAc() {
+        sessionStorage.setItem('mavikonak_giris', '1');
+        document.getElementById('kilitEkran').style.display = 'none';
+    }
+
+    async function kilitBtnTikla() {
+        if (kilitDurum === 'kurulum_qr') {
+            const kod = document.getElementById('qrDogrulaInput').value.trim();
+            if (kod.length !== 6) {
+                document.getElementById('kilitHata').textContent = '6 haneli kodu gir';
+                return;
+            }
+            const tamam = await totpDogrula(totpSecret, kod);
+            if (!tamam) {
+                document.getElementById('kilitHata').textContent = 'Yanlış kod — Authenticator\'ı kontrol et';
+                return;
+            }
+            // Kaydet
+            const hash = await pinHash(kurulumPin);
+            await db.collection('ayarlar').doc('guvenlik').set({
+                pinHash: hash, totpSecret
+            });
+            kilitAc();
+        }
+    }
+
+    function kilitIkincilTikla() {
+        if (kilitDurum === 'kurulum_qr') kilitEkraniGoster('kurulum_pin');
+    }
+
+    function qrKodCiz() {
+        const uri = `otpauth://totp/Mavikonak?secret=${totpSecret}&issuer=SFK`;
+        const el  = document.getElementById('qrCanvas');
+        el.innerHTML = '';
+        try {
+            new QRCode(el, { text: uri, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M });
+        } catch(e) { el.textContent = uri; }
+    }
+
+    async function kilitBaslat() {
+        if (sessionStorage.getItem('mavikonak_giris') === '1') {
+            document.getElementById('kilitEkran').style.display = 'none';
+            return;
+        }
+        // Firebase hazır mı bekle
+        let deneme = 0;
+        while (!dbHazir && deneme++ < 20) await new Promise(r => setTimeout(r, 100));
+
+        try {
+            const snap = await db.collection('ayarlar').doc('guvenlik').get();
+            if (snap.exists) {
+                kilitEkraniGoster('giris_pin');
+            } else {
+                kilitEkraniGoster('kurulum_pin');
+            }
+        } catch(e) {
+            kilitEkraniGoster('giris_pin');
+        }
+    }
+
     // ── Firebase ─────────────────────────────────────────────
     const firebaseConfig = {
         apiKey: "AIzaSyD_zEbZek8IyacdHojnBpb4cWTIvBSdOtk",
@@ -839,6 +1238,8 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    dbHazir = true;
+    kilitBaslat();
 
     // ── Sabitler & Durum ──────────────────────────────────────
     let tumVeri           = [];
