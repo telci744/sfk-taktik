@@ -88,12 +88,12 @@ async function fsDelete(col, doc) {
 async function dosyaBufferOku(dosyaId) {
     const meta = await fsGet('dosyalar', dosyaId);
     const parcaSayisi = meta.parcaSayisi || 1;
-    let base64Tam = '';
+    const buffers = [];
     for (let i = 0; i < parcaSayisi; i++) {
         const parca = await fsGet(`dosyalar/${dosyaId}/parcalar`, String(i));
-        base64Tam += parca.data;
+        buffers.push(Buffer.from(parca.data, 'base64'));
     }
-    return { buffer: Buffer.from(base64Tam, 'base64'), mime: meta.mime, ad: meta.ad };
+    return { buffer: Buffer.concat(buffers), mime: meta.mime, ad: meta.ad };
 }
 
 async function fsQuery(col, field, op, value) {
