@@ -2,154 +2,23 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Mavikonak Kasa</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yönetim</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
-    <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: -apple-system, sans-serif; background-color: #e5e5ea; margin: 0; padding: 0; color: #1c1c1e; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
-        
-        /* Kasa ekranı tabletlerde de rahat kullanılsın diye max-width'i biraz daha geniş tuttuk */
-        .app-wrapper { width: 100%; max-width: 768px; background-color: #f4f6f8; min-height: 100vh; position: relative; box-shadow: 0 0 30px rgba(0,0,0,0.1); padding: 20px; padding-top: max(20px, env(safe-area-inset-top)); }
-
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e5ea; padding-bottom: 15px; margin-bottom: 20px; }
-        .header-sol { display: flex; flex-direction: column; gap: 5px; }
-        .header h1 { font-size: 20px; color: #007aff; margin: 0; }
-        .karsilama { font-size: 13px; color: #8e8e93; font-weight: 600; }
-        
-        .header-sag { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-        .canli-ikon { font-size: 12px; color: #34c759; font-weight: 800; display: flex; align-items: center; gap: 6px; }
-        .canli-ikon::before { content: ""; display: block; width: 8px; height: 8px; background: #34c759; border-radius: 50%; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.7); } 70% { box-shadow: 0 0 0 8px rgba(52, 199, 89, 0); } 100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); } }
-        
-        .btn-nav { background: #e5f0ff; color: #007aff; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 12px; text-align: center; }
-        
-        .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
-        .masa-card { background: white; border: 1px solid #e5e5ea; border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); }
-        .masa-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f2f2f7; padding-bottom: 12px; margin-bottom: 15px; }
-        .masa-header h2 { margin: 0; color: #1c1c1e; font-size: 20px; }
-        
-        .siparis-listesi { font-size: 14px; margin-bottom: 15px; line-height: 1.8; color: #3a3a3c; }
-        .siparis-grup { margin-bottom: 15px; background: #fafafa; padding: 12px; border-radius: 10px; border: 1px solid #f2f2f7; }
-        .zaman-etiket { font-size: 11px; color: #8e8e93; display: block; margin-bottom: 8px; font-weight: bold; border-bottom: 1px solid #e5e5ea; padding-bottom: 4px; }
-        .urun-satir { display: flex; justify-content: space-between; margin-bottom: 4px; }
-        .urun-satir b { color: #007aff; }
-
-        .siparis-notu { background: #fff5e5; color: #d97706; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-top: 10px; border-left: 4px solid #f59e0b; line-height: 1.5; }
-
-        .toplam-tutar { font-size: 18px; font-weight: 900; color: #1c1c1e; margin-bottom: 15px; text-align: right; }
-        .btn-kapat { width: 100%; background: #34c759; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: 800; font-size: 15px; cursor: pointer; box-shadow: 0 4px 10px rgba(52, 199, 89, 0.2); }
-        .bos-mesaj { text-align: center; color: #8e8e93; margin-top: 50px; font-size: 15px; grid-column: 1 / -1; }
-    </style>
 </head>
 <body>
-    <div class="app-wrapper">
-        <div class="header">
-            <div class="header-sol">
-                <h1>MAVİKONAK KASA</h1>
-                <div id="karsilamaMetni" class="karsilama">Yükleniyor...</div>
-            </div>
-            <div class="header-sag">
-                <div class="canli-ikon">Sistem Canlı</div>
-                <div style="display:flex; gap:5px;">
-                    <a href="index.html" class="btn-nav">⬅ Ana Ekran</a>
-                    <a href="kurum.html" class="btn-nav">Menü Ayarları</a>
-                </div>
-            </div>
-        </div>
-
-        <div id="aktifMasalar" class="grid-container"></div>
-    </div>
-
     <script>
-        let yoneticiAdi = localStorage.getItem("mavikonak_isim");
-        if (!yoneticiAdi) {
-            yoneticiAdi = prompt("Sisteme hoş geldiniz. Lütfen adınızı giriniz:");
-            if (yoneticiAdi && yoneticiAdi.trim() !== "") { localStorage.setItem("mavikonak_isim", yoneticiAdi); } 
-            else { yoneticiAdi = "Yönetici"; }
-        }
-        document.getElementById("karsilamaMetni").innerText = "Kasiyer: " + yoneticiAdi;
-
-        const firebaseConfig = { apiKey: "AIzaSyD_zEbZek8IyacdHojnBpb4cWTIvBSdOtk", authDomain: "sfk-taktik.firebaseapp.com", projectId: "sfk-taktik", storageBucket: "sfk-taktik.firebasestorage.app", messagingSenderId: "773612917206", appId: "1:773612917206:web:6c21289cc1fc179c5a9477" };
-        firebase.initializeApp(firebaseConfig); 
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_zEbZek8IyacdHojnBpb4cWTIvBSdOtk",
+            authDomain: "sfk-taktik.firebaseapp.com",
+            projectId: "sfk-taktik",
+            storageBucket: "sfk-taktik.firebasestorage.app",
+            messagingSenderId: "773612917206",
+            appId: "1:773612917206:web:6c21289cc1fc179c5a9477"
+        };
+        firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-
-        db.collection("aktif_masalar").onSnapshot(snap => {
-            const container = document.getElementById('aktifMasalar');
-            if (snap.empty) { container.innerHTML = '<div class="bos-mesaj">Bekleyen açık masa yok.</div>'; return; }
-            
-            let html = '';
-            snap.forEach(doc => {
-                const veri = doc.data();
-                let siparisDetay = '';
-                
-                if(veri.yeniSiparisUrunleri && veri.yeniSiparisUrunleri.length > 0) {
-                    veri.yeniSiparisUrunleri.forEach((grup, index) => {
-                        const saat = new Date(grup.eklenmeZamani).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});
-                        
-                        let urunlerHtml = '';
-                        grup.urunler.forEach(urun => {
-                            urunlerHtml += `<div class="urun-satir"><span><b>${urun.miktar}x</b> ${urun.ad}</span> <span>${urun.miktar * urun.fiyat} ₺</span></div>`;
-                        });
-
-                        let notHtml = grup.not ? `<div class="siparis-notu">👨‍🍳 <b>Aşçıya Not:</b> ${grup.not}</div>` : '';
-                        
-                        let durumHtml = grup.teslimEdildi 
-                            ? `<div style="color:#34c759; font-size:12px; font-weight:bold; margin-top:8px;">✓ Masaya Teslim Edildi</div>`
-                            : `<button style="background:#007aff; color:white; border:none; padding:8px 12px; border-radius:8px; font-weight:bold; cursor:pointer; margin-top:10px; font-size:12px; width:100%; box-shadow: 0 2px 8px rgba(0,122,255,0.2);" onclick="siparisTeslimEdildi('${doc.id}', ${grup.siparisId})">🔔 Masaya Teslim Edildi İşaretle</button>`;
-
-                        siparisDetay += `
-                        <div class="siparis-grup">
-                            <span class="zaman-etiket">${index + 1}. Sipariş (${saat})</span>
-                            ${urunlerHtml}
-                            ${notHtml}
-                            ${durumHtml}
-                        </div>`;
-                    });
-                }
-
-                html += `
-                    <div class="masa-card">
-                        <div class="masa-header">
-                            <h2>Masa ${veri.masa}</h2>
-                            <span style="font-size:12px; color:#007aff; font-weight:bold; background:#e5f0ff; padding:4px 8px; border-radius:10px;">Aktif</span>
-                        </div>
-                        <div class="siparis-listesi">${siparisDetay}</div>
-                        <div class="toplam-tutar">Toplam: ${veri.toplamTutar} ₺</div>
-                        <button class="btn-kapat" onclick="hesabiKapat('${doc.id}')">Ödendi İşaretle & Kapat</button>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
-        });
-
-        function siparisTeslimEdildi(docId, siparisId) {
-            const ref = db.collection("aktif_masalar").doc(docId);
-            ref.get().then(doc => {
-                if(doc.exists) {
-                    const veri = doc.data();
-                    const yeniDizi = veri.yeniSiparisUrunleri.map(grup => {
-                        if(grup.siparisId === siparisId) { return { ...grup, teslimEdildi: true }; }
-                        return grup;
-                    });
-                    ref.update({ yeniSiparisUrunleri: yeniDizi });
-                }
-            });
-        }
-
-        function hesabiKapat(docId) {
-            if(confirm("Hesap ödendi olarak işaretlenip masa sıfırlanacaktır. Emin misiniz?")) {
-                const ref = db.collection("aktif_masalar").doc(docId);
-                ref.get().then(doc => {
-                    if(doc.exists) {
-                        db.collection("gecmis_siparisler").add({
-                            ...doc.data(), kapanisTarihi: Date.now(), kapatanKasa: yoneticiAdi
-                        }).then(() => ref.delete());
-                    }
-                });
-            }
-        }
     </script>
 </body>
 </html>

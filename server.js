@@ -1,4 +1,4 @@
-const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const express  = require('express');
 const cors     = require('cors');
 const qrcode   = require('qrcode');
@@ -20,6 +20,7 @@ const authDir    = path.join(__dirname, 'auth_info');
 [uploadsDir, authDir].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 
 app.use('/uploads', express.static(uploadsDir));
+app.use(express.static(__dirname, { index: 'index.html' }));
 
 const upload = multer({ dest: uploadsDir, limits: { fileSize: 50 * 1024 * 1024 } });
 
@@ -29,13 +30,17 @@ let sock   = null;
 
 async function baslat() {
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
+    const { version } = await fetchLatestBaileysVersion();
 
     sock = makeWASocket({
+        version,
         auth:  state,
         logger: pino({ level: 'silent' }),
         printQRInTerminal: false,
-        browser: ['Mavikonak', 'Chrome', '1.0.0'],
-        generateHighQualityLinkPreview: false
+        browser: ['Ubuntu', 'Chrome', '22.04'],
+        generateHighQualityLinkPreview: false,
+        connectTimeoutMs: 30000,
+        keepAliveIntervalMs: 10000
     });
 
     sock.ev.on('connection.update', async (update) => {
@@ -53,7 +58,14 @@ async function baslat() {
             const statusCode   = lastDisconnect?.error?.output?.statusCode;
             const cikisYapildi = statusCode === DisconnectReason.loggedOut;
             console.log('🔴 Bağlantı kesildi:', statusCode);
-            setTimeout(baslat, cikisYapildi ? 1000 : 4000);
+            // 405 = multidevice sorunu, auth sil ve yeniden dene
+            if (statusCode === 405) {
+                fs.rmSync(authDir, { recursive: true, force: true });
+                fs.mkdirSync(authDir, { recursive: true });
+                console.log('🔄 Auth temizlendi, QR yeniden oluşturulacak');
+            }
+            if (!cikisYapildi) setTimeout(baslat, 5000);
+            else baslat();
         }
 
         if (connection === 'open') {

@@ -730,24 +730,18 @@
     <div class="modal">
         <div class="modal-tutac"></div>
         <div class="modal-baslik">
-            <h2>Sunucu Ayarı</h2>
+            <h2>Bilgi</h2>
             <button class="btn-kapat-modal" onclick="modalKapat('ayarOverlay')">✕</button>
         </div>
-
-        <div class="form-grup">
-            <label>Sunucu URL</label>
-            <input type="url" id="inputSunucuUrl" placeholder="https://xxx.railway.app">
-            <div style="font-size:12px;color:#8e8e93;margin-top:8px;line-height:1.6;">
-                Railway'e deploy ettikten sonra aldığın URL'yi buraya gir.<br>
-                Yerel kullanım için boş bırak.
-            </div>
+        <div style="background:#f2f2f7;border-radius:12px;padding:16px;font-size:14px;line-height:1.8;margin-bottom:16px;">
+            <div id="ayarDurumMetin" style="color:#8e8e93;">Kontrol ediliyor...</div>
         </div>
-
-        <div style="background:#f2f2f7;border-radius:12px;padding:14px;font-size:13px;line-height:1.8;margin-bottom:16px;">
-            <div id="ayarDurumMetin" style="color:#8e8e93;">Yükleniyor...</div>
+        <div style="font-size:13px;color:#8e8e93;line-height:1.8;">
+            <b>Nasıl erişilir?</b><br>
+            📱 Telefon: <code style="background:#f2f2f7;padding:2px 6px;border-radius:4px;">http://100.111.136.11:3001</code><br>
+            💻 Bilgisayar: <code style="background:#f2f2f7;padding:2px 6px;border-radius:4px;">http://localhost:3001</code><br><br>
+            Tailscale açık olmalı.
         </div>
-
-        <button class="btn-ana" onclick="ayarKaydet()">Kaydet</button>
     </div>
 </div>
 
@@ -765,7 +759,7 @@
     const db = firebase.firestore();
 
     // ── Sabitler & Durum ──────────────────────────────────────
-    const SUNUCU = localStorage.getItem('sunucuUrl') || 'http://localhost:3001';
+    const SUNUCU = '';
 
     let tumVeri       = [];
     let aktifFiltre   = "tumu";
