@@ -6,7 +6,6 @@
     <title>Anımsatıcılar</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
 
@@ -757,8 +756,7 @@
         appId: "1:773612917206:web:6c21289cc1fc179c5a9477"
     };
     firebase.initializeApp(firebaseConfig);
-    const db      = firebase.firestore();
-    const storage = firebase.storage();
+    const db = firebase.firestore();
 
     // ── Sabitler & Durum ──────────────────────────────────────
     let tumVeri           = [];
@@ -994,25 +992,37 @@
         barBg.style.display = "block";
         bar.style.width = "5%";
 
-        const uzanti   = dosya.name.includes('.') ? dosya.name.split('.').pop() : '';
-        const dosyaYol = `uploads/${Date.now()}_${Math.random().toString(36).slice(2,6)}${uzanti ? '.' + uzanti : ''}`;
-        const ref      = storage.ref().child(dosyaYol);
-        const task     = ref.put(dosya);
+        // Dosyayı oku ve 700KB'lık parçalara böl (Firestore 1MB belge limiti)
+        const buf    = await dosya.arrayBuffer();
+        const bytes  = new Uint8Array(buf);
+        const PARCA  = 700 * 1024;
+        const parcalar = [];
+        for (let i = 0; i < bytes.length; i += PARCA) {
+            const dilim = bytes.slice(i, i + PARCA);
+            let ikili = '';
+            dilim.forEach(b => ikili += String.fromCharCode(b));
+            parcalar.push(btoa(ikili));
+        }
 
-        await new Promise((resolve, reject) => {
-            task.on('state_changed',
-                snap => {
-                    const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 90 + 5);
-                    bar.style.width = pct + '%';
-                },
-                reject,
-                resolve
-            );
+        bar.style.width = "20%";
+
+        // Ana metadata belgesi
+        const dosyaRef = await db.collection("dosyalar").add({
+            ad:          dosya.name,
+            mime:        dosya.type || 'application/octet-stream',
+            boyut:       dosya.size,
+            parcaSayisi: parcalar.length,
+            olusturma:   firebase.firestore.FieldValue.serverTimestamp()
         });
 
+        // Her parçayı alt koleksiyona yaz
+        for (let i = 0; i < parcalar.length; i++) {
+            await dosyaRef.collection("parcalar").doc(String(i)).set({ data: parcalar[i] });
+            bar.style.width = Math.round(20 + 75 * (i + 1) / parcalar.length) + '%';
+        }
+
         bar.style.width = "100%";
-        const url = await ref.getDownloadURL();
-        return { url, ad: dosya.name };
+        return { dosyaId: dosyaRef.id, ad: dosya.name };
     }
 
     // ── Kaydet ───────────────────────────────────────────────
@@ -1024,13 +1034,13 @@
         btn.disabled = true;
 
         try {
-            let dosyaUrl = null;
+            let dosyaId  = null;
             let dosyaAdi = null;
 
             if (secilenDosya) {
                 btn.textContent = "Dosya yükleniyor...";
                 const yuklemeSonuc = await dosyayiYukle(secilenDosya);
-                dosyaUrl = yuklemeSonuc.url;
+                dosyaId  = yuklemeSonuc.dosyaId;
                 dosyaAdi = yuklemeSonuc.ad;
             } else {
                 btn.textContent = "Kaydediliyor...";
@@ -1042,7 +1052,7 @@
                 saat:       document.getElementById("inputSaat").value  || null,
                 oncelik:    seciliOncelik,
                 mesaj:      document.getElementById("inputMesaj").value.trim() || null,
-                dosyaUrl,
+                dosyaId,
                 dosyaAdi,
                 tamamlandi: false,
                 olusturulma: firebase.firestore.FieldValue.serverTimestamp()
@@ -1185,8 +1195,8 @@
                 tur:       'gonder',
                 grupIdler: seciliGrupIdler,
                 mesaj:     item.mesaj || item.baslik,
-                dosyaUrl:  item.dosyaUrl  || null,
-                dosyaAdi:  item.dosyaAdi  || null,
+                dosyaId:   item.dosyaId  || null,
+                dosyaAdi:  item.dosyaAdi || null,
                 durum:     'bekliyor',
                 ilerleme:  0,
                 toplam:    seciliGrupIdler.length,

@@ -74,8 +74,26 @@ async function fsUpdate(col, doc, data) {
     if (!r.ok) throw new Error(await r.text());
 }
 
+async function fsGet(col, doc) {
+    const r = await fetch(`${FS_BASE}/${col}/${doc}?key=${FIREBASE_API_KEY}`);
+    if (!r.ok) throw new Error(await r.text());
+    const data = await r.json();
+    return fieldsToObj(data.fields || {});
+}
+
 async function fsDelete(col, doc) {
     await fetch(`${FS_BASE}/${col}/${doc}?key=${FIREBASE_API_KEY}`, { method: 'DELETE' });
+}
+
+async function dosyaBufferOku(dosyaId) {
+    const meta = await fsGet('dosyalar', dosyaId);
+    const parcaSayisi = meta.parcaSayisi || 1;
+    let base64Tam = '';
+    for (let i = 0; i < parcaSayisi; i++) {
+        const parca = await fsGet(`dosyalar/${dosyaId}/parcalar`, String(i));
+        base64Tam += parca.data;
+    }
+    return { buffer: Buffer.from(base64Tam, 'base64'), mime: meta.mime, ad: meta.ad };
 }
 
 async function fsQuery(col, field, op, value) {
@@ -190,22 +208,27 @@ async function isKontrol() {
         try {
             await fsUpdate('isler', is._id, { durum: 'isleniyor' });
 
-            const { grupIdler, mesaj, dosyaUrl, dosyaAdi } = is;
+            const { grupIdler, mesaj, dosyaId, dosyaAdi } = is;
             const sonuclar = [];
+
+            // Dosya varsa tek seferinde oku
+            let dosyaBilgi = null;
+            if (dosyaId) {
+                dosyaBilgi = await dosyaBufferOku(dosyaId);
+                console.log(`📎 Dosya okundu: ${dosyaBilgi.ad} (${dosyaBilgi.buffer.length} byte)`);
+            }
 
             for (let i = 0; i < grupIdler.length; i++) {
                 const grupId = grupIdler[i];
                 try {
-                    if (dosyaUrl) {
-                        const resp        = await fetch(dosyaUrl);
-                        const arrayBuffer = await resp.arrayBuffer();
-                        const buffer      = Buffer.from(arrayBuffer);
-                        const ct          = resp.headers.get('content-type') || 'application/octet-stream';
-                        const mimeType    = ct.split(';')[0].trim();
+                    if (dosyaBilgi) {
+                        const { buffer, mime, ad } = dosyaBilgi;
+                        const mimeType = mime || 'application/octet-stream';
+                        const goruntulAd = dosyaAdi || ad || 'dosya';
 
                         const icerik = mimeType.startsWith('image/')
                             ? { image: buffer, caption: mesaj || '', mimetype: mimeType }
-                            : { document: buffer, mimetype: mimeType, fileName: dosyaAdi || 'dosya', caption: mesaj || '' };
+                            : { document: buffer, mimetype: mimeType, fileName: goruntulAd, caption: mesaj || '' };
 
                         await sock.sendMessage(grupId, icerik);
                     } else {
