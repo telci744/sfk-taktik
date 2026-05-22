@@ -761,7 +761,12 @@
     <div id="qrKurulumAlani" style="display:none;">
         <div class="qr-setup-alan">
             <div id="qrCanvas" style="display:inline-block;"></div>
-            <p>Google Authenticator'ı açın ve QR kodu taratın</p>
+            <p>Google Authenticator → + → QR kodu tara</p>
+            <div style="margin-top:12px;border-top:1px solid #e5e5ea;padding-top:12px;">
+                <p style="font-size:11px;color:#8e8e93;margin-bottom:6px;">veya Elle Gir seçeneğiyle bu kodu yaz:</p>
+                <div id="totpManuelKod" style="font-family:monospace;font-size:15px;font-weight:700;color:#1c1c1e;letter-spacing:2px;word-break:break-all;"></div>
+                <p style="font-size:10px;color:#c7c7cc;margin-top:4px;">Hesap adı: Mavikonak SFK</p>
+            </div>
         </div>
         <input type="tel" class="auth-input" id="qrDogrulaInput"
                maxlength="6" placeholder="6 haneli kod"
@@ -1198,12 +1203,17 @@
     }
 
     function qrKodCiz() {
-        const uri = `otpauth://totp/Mavikonak?secret=${totpSecret}&issuer=SFK`;
+        const uri = `otpauth://totp/Mavikonak%20SFK?secret=${totpSecret}&issuer=Mavikonak`;
         const el  = document.getElementById('qrCanvas');
         el.innerHTML = '';
         try {
-            new QRCode(el, { text: uri, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M });
-        } catch(e) { el.textContent = uri; }
+            new QRCode(el, { text: uri, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.L });
+        } catch(e) {}
+        // Manuel giriş için secret'ı göster
+        const manuelEl = document.getElementById('totpManuelKod');
+        if (manuelEl) {
+            manuelEl.textContent = totpSecret.match(/.{1,4}/g).join(' ');
+        }
     }
 
     async function kilitBaslat() {
