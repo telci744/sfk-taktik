@@ -763,9 +763,9 @@
             <div id="qrCanvas" style="display:inline-block;"></div>
             <p>Google Authenticator → + → QR kodu tara</p>
             <div style="margin-top:12px;border-top:1px solid #e5e5ea;padding-top:12px;">
-                <p style="font-size:11px;color:#8e8e93;margin-bottom:6px;">veya Elle Gir seçeneğiyle bu kodu yaz:</p>
-                <div id="totpManuelKod" style="font-family:monospace;font-size:15px;font-weight:700;color:#1c1c1e;letter-spacing:2px;word-break:break-all;"></div>
-                <p style="font-size:10px;color:#c7c7cc;margin-top:4px;">Hesap adı: Mavikonak SFK</p>
+                <p style="font-size:11px;color:#8e8e93;margin-bottom:6px;">veya <b>Elle Gir</b> → bu kodu aynen yaz (boşluksuz):</p>
+                <div id="totpManuelKod" onclick="this.style.background='#e5f0ff'" style="font-family:monospace;font-size:16px;font-weight:700;color:#007aff;letter-spacing:3px;padding:8px;background:#f2f2f7;border-radius:8px;cursor:pointer;"></div>
+                <p style="font-size:10px;color:#8e8e93;margin-top:6px;">Hesap adı: <b>Mavikonak</b> &nbsp;|&nbsp; Tür: <b>Zamana dayalı</b></p>
             </div>
         </div>
         <input type="tel" class="auth-input" id="qrDogrulaInput"
@@ -1004,7 +1004,7 @@
         return new Uint8Array(out);
     }
 
-    function randomBase32(len = 20) {
+    function randomBase32(len = 16) {
         const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
         const rnd   = crypto.getRandomValues(new Uint8Array(len));
         return Array.from(rnd, b => alpha[b & 31]).join('');
@@ -1211,9 +1211,7 @@
         } catch(e) {}
         // Manuel giriş için secret'ı göster
         const manuelEl = document.getElementById('totpManuelKod');
-        if (manuelEl) {
-            manuelEl.textContent = totpSecret.match(/.{1,4}/g).join(' ');
-        }
+        if (manuelEl) manuelEl.textContent = totpSecret;
     }
 
     async function kilitBaslat() {
