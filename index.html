@@ -573,6 +573,68 @@
             font-size: 14px;
             padding: 20px 0;
         }
+
+        /* ── Otomatik Gönder Toggle ── */
+        .otomatik-bolum {
+            border: 1.5px solid #e5e5ea;
+            border-radius: 12px;
+            padding: 12px 14px;
+            background: #f9f9fb;
+        }
+        .otomatik-toggle-satir {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .otomatik-toggle-satir label:first-child {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1c1c1e;
+        }
+        .toggle-sw { position: relative; display: inline-block; width: 44px; height: 26px; }
+        .toggle-sw input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #e5e5ea; border-radius: 26px; transition: .3s;
+        }
+        .toggle-slider:before {
+            content: ""; position: absolute;
+            height: 20px; width: 20px; left: 3px; bottom: 3px;
+            background: white; border-radius: 50%; transition: .3s;
+            box-shadow: 0 1px 3px rgba(0,0,0,.2);
+        }
+        input:checked + .toggle-slider { background: #34c759; }
+        input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+        .otomatik-grup-bolum { margin-top: 12px; }
+        .otomatik-grup-aciklama {
+            font-size: 12px; color: #8e8e93; margin-bottom: 8px;
+        }
+        .otomatik-grup-listesi {
+            max-height: 160px; overflow-y: auto;
+            border: 1px solid #e5e5ea; border-radius: 10px;
+            background: white;
+        }
+        .ot-grup-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 12px; border-bottom: 1px solid #f2f2f7;
+            cursor: pointer; font-size: 13px; transition: .15s;
+        }
+        .ot-grup-item:last-child { border-bottom: none; }
+        .ot-grup-item.secili { background: #f0fff4; }
+        .ot-grup-check {
+            width: 20px; height: 20px; border-radius: 50%;
+            border: 2px solid #c7c7cc; display: flex;
+            align-items: center; justify-content: center;
+            font-size: 11px; flex-shrink: 0; color: white;
+        }
+        .ot-grup-item.secili .ot-grup-check { background: #34c759; border-color: #34c759; }
+
+        .zamanlandi-badge {
+            display: inline-flex; align-items: center; gap: 3px;
+            font-size: 11px; color: #ff9500; font-weight: 700;
+        }
     </style>
 </head>
 <body>
@@ -662,6 +724,26 @@
             </div>
             <div class="yuklenme-bar-bg" id="yuklenmeBarBg">
                 <div class="yuklenme-bar" id="yuklenmeBar"></div>
+            </div>
+        </div>
+
+        <div class="form-grup">
+            <div class="otomatik-bolum">
+                <div class="otomatik-toggle-satir">
+                    <label for="otomatikToggle">⏰ Otomatik Gönder</label>
+                    <label class="toggle-sw">
+                        <input type="checkbox" id="otomatikToggle" onchange="otomatikGonderToggle(this)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div id="otomatikGrupBolum" style="display:none;">
+                    <div class="otomatik-grup-bolum">
+                        <div class="otomatik-grup-aciklama">Yukarıdaki tarih ve saatte seçili gruplara otomatik gönderilecek</div>
+                        <div id="otGrupListesi" class="otomatik-grup-listesi">
+                            <div class="grup-yuklenme">Yükleniyor...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -886,6 +968,7 @@
                         ${tarihMetni ? `<span class="kart-tarih ${gecmisMi ? 'gecmis' : ''}">${tarihMetni}</span>` : ""}
                         <span class="oncelik-badge ${item.oncelik}">${oncelikMetin}</span>
                         ${item.dosyaAdi ? `<span class="dosya-badge">📎 ${guvenliFirat(item.dosyaAdi)}</span>` : ""}
+                        ${item.otomatikGonder && !item.tamamlandi ? `<span class="zamanlandi-badge">⏰ Zamanlı</span>` : ""}
                     </div>
                 </div>
                 <div class="kart-butonlar">
@@ -1025,6 +1108,57 @@
         return { dosyaId: dosyaRef.id, ad: dosya.name };
     }
 
+    // ── Otomatik Gönder ───────────────────────────────────────
+    let otGruplar = []; // seçili grup id'leri
+
+    async function otomatikGonderToggle(cb) {
+        const bolum = document.getElementById('otomatikGrupBolum');
+        if (cb.checked) {
+            bolum.style.display = 'block';
+            await otGruplariYukle();
+        } else {
+            bolum.style.display = 'none';
+            otGruplar = [];
+        }
+    }
+
+    async function otGruplariYukle() {
+        const liste = document.getElementById('otGrupListesi');
+        liste.innerHTML = '<div class="grup-yuklenme">Yükleniyor...</div>';
+        try {
+            const snap = await db.collection("gruplar").doc("liste").get();
+            const veri = snap.data();
+            if (!veri?.items?.length) {
+                liste.innerHTML = '<div class="grup-yuklenme" style="font-size:12px;">WhatsApp bağlı değil veya gruplar henüz yüklenmedi</div>';
+                return;
+            }
+            liste.innerHTML = veri.items.map(g => {
+                const safe = g.id.replace(/[^a-z0-9]/gi,'_');
+                return `<div class="ot-grup-item" id="otG_${safe}" onclick="otGrupToggle('${g.id}')">
+                    <div class="ot-grup-check" id="otC_${safe}"></div>
+                    <span>${guvenliFirat(g.ad)}</span>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            liste.innerHTML = `<div class="grup-yuklenme" style="color:#ff3b30;font-size:12px;">Yüklenemedi: ${e.message}</div>`;
+        }
+    }
+
+    function otGrupToggle(id) {
+        const safe  = id.replace(/[^a-z0-9]/gi,'_');
+        const item  = document.getElementById(`otG_${safe}`);
+        const check = document.getElementById(`otC_${safe}`);
+        if (otGruplar.includes(id)) {
+            otGruplar = otGruplar.filter(x => x !== id);
+            item.classList.remove('secili');
+            check.textContent = '';
+        } else {
+            otGruplar.push(id);
+            item.classList.add('secili');
+            check.textContent = '✓';
+        }
+    }
+
     // ── Kaydet ───────────────────────────────────────────────
     async function kaydet() {
         const baslik = document.getElementById("inputBaslik").value.trim();
@@ -1046,6 +1180,9 @@
                 btn.textContent = "Kaydediliyor...";
             }
 
+            const otToggle = document.getElementById('otomatikToggle').checked;
+            const otAktif  = otToggle && otGruplar.length > 0;
+
             await db.collection("animsaticilar").add({
                 baslik,
                 tarih:      document.getElementById("inputTarih").value || null,
@@ -1054,7 +1191,10 @@
                 mesaj:      document.getElementById("inputMesaj").value.trim() || null,
                 dosyaId,
                 dosyaAdi,
-                tamamlandi: false,
+                tamamlandi:         false,
+                otomatikGonder:     otAktif,
+                otomatikGruplar:    otAktif ? [...otGruplar] : null,
+                otomatikGonderildi: false,
                 olusturulma: firebase.firestore.FieldValue.serverTimestamp()
             });
 
@@ -1063,6 +1203,9 @@
             document.getElementById("inputMesaj").value  = "";
             document.getElementById("inputSaat").value   = "";
             document.getElementById("inputTarih").value  = bugun.toISOString().split("T")[0];
+            document.getElementById("otomatikToggle").checked = false;
+            document.getElementById("otomatikGrupBolum").style.display = "none";
+            otGruplar = [];
             dosyaKaldir();
             modalKapat('overlay');
         } catch(e) {

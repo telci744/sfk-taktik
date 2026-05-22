@@ -81,6 +81,34 @@ async function fsGet(col, doc) {
     return fieldsToObj(data.fields || {});
 }
 
+async function fsAdd(col, data) {
+    const r = await fetch(`${FS_BASE}/${col}?key=${FIREBASE_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: objToFields(data) })
+    });
+    if (!r.ok) throw new Error(await r.text());
+}
+
+async function fsQueryAll(col, field, op, value) {
+    const fsVal = typeof value === 'boolean' ? { booleanValue: value } : { stringValue: value };
+    const r = await fetch(`${FS_BASE}:runQuery?key=${FIREBASE_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            structuredQuery: {
+                from: [{ collectionId: col }],
+                where: { fieldFilter: { field: { fieldPath: field }, op, value: fsVal } }
+            }
+        })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const rows = await r.json();
+    return rows
+        .filter(x => x.document)
+        .map(x => ({ _id: x.document.name.split('/').pop(), ...fieldsToObj(x.document.fields) }));
+}
+
 async function fsDelete(col, doc) {
     await fetch(`${FS_BASE}/${col}/${doc}?key=${FIREBASE_API_KEY}`, { method: 'DELETE' });
 }
@@ -249,6 +277,9 @@ async function isKontrol() {
             const basarili = sonuclar.filter(s => s.basari).length;
             console.log(`📊 ${basarili}/${grupIdler.length}`);
             await fsUpdate('isler', is._id, { durum: 'tamamlandi', basarili, toplam: grupIdler.length });
+            if (basarili > 0 && is.animsaticiId) {
+                await fsUpdate('animsaticilar', is.animsaticiId, { tamamlandi: true }).catch(() => {});
+            }
         } catch (e) {
             console.error('İş hatası:', e.message);
             await fsUpdate('isler', is._id, { durum: 'hata', hata: e.message }).catch(() => {});
@@ -259,6 +290,44 @@ async function isKontrol() {
 }
 
 setInterval(isKontrol, 3000);
+
+// ── Zamanlı gönderim ──────────────────────────────────────────
+async function zamanlıGonderimKontrol() {
+    if (!hazir) return;
+    try {
+        const adaylar = await fsQueryAll('animsaticilar', 'otomatikGonder', 'EQUAL', true);
+        const simdi   = new Date();
+
+        for (const item of adaylar) {
+            if (item.tamamlandi || item.otomatikGonderildi) continue;
+            if (!item.tarih || !item.otomatikGruplar?.length) continue;
+
+            const zamanStr    = `${item.tarih}T${item.saat || '00:00'}:00`;
+            const zamanlanmis = new Date(zamanStr);
+            if (zamanlanmis > simdi) continue;
+
+            console.log(`⏰ Zamanlı gönderim başlıyor: ${item.baslik}`);
+            await fsUpdate('animsaticilar', item._id, { otomatikGonderildi: true });
+            await fsAdd('isler', {
+                tur:          'gonder',
+                grupIdler:    item.otomatikGruplar,
+                mesaj:        item.mesaj || item.baslik,
+                dosyaId:      item.dosyaId  || null,
+                dosyaAdi:     item.dosyaAdi || null,
+                durum:        'bekliyor',
+                ilerleme:     0,
+                toplam:       item.otomatikGruplar.length,
+                animsaticiId: item._id
+            });
+        }
+    } catch(e) {
+        if (!e.message?.includes('DOCUMENT_NOT_FOUND')) {
+            console.error('Zamanlı kontrol hatası:', e.message);
+        }
+    }
+}
+
+setInterval(zamanlıGonderimKontrol, 30000);
 
 console.log('⏳ WhatsApp başlatılıyor...');
 baslat().catch(console.error);
