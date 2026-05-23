@@ -743,19 +743,56 @@
         .panel-title { font-size: 14px; font-weight: 800; color: #1c1c1e; margin-top: 14px; }
         .panel-sub   { font-size: 12px; color: #8e8e93; margin-top: 3px; line-height: 1.4; }
 
-        /* Mesaj Gönder — tam genişlik, koyu */
+        /* Mesaj Gönder — tam genişlik, koyu, ortada */
         .panel-primary {
             grid-column: 1 / -1;
             min-height: 96px;
-            flex-direction: row;
+            flex-direction: column;
             align-items: center;
-            gap: 18px;
+            justify-content: center;
+            gap: 10px;
             background: #0a2d6e;
-            padding: 22px 24px;
+            padding: 24px;
+            text-align: center;
         }
-        .panel-primary .panel-icon { background: rgba(255,255,255,.15); font-size: 24px; flex-shrink: 0; }
+        .panel-primary .panel-icon  { background: rgba(255,255,255,.15); font-size: 26px; }
         .panel-primary .panel-title { color: white; font-size: 17px; margin-top: 0; }
-        .panel-primary .panel-sub   { color: rgba(255,255,255,.6); }
+        .panel-primary .panel-sub   { color: rgba(255,255,255,.6); margin-top: 2px; }
+
+        /* ── Haftalık Takvim ── */
+        .takvim-bolum { padding: 12px 16px 8px; }
+        .takvim-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .takvim-nav-btn {
+            background: #f2f2f7; border: none; width: 32px; height: 32px;
+            border-radius: 10px; font-size: 16px; cursor: pointer; color: #007aff; font-weight: 700;
+        }
+        .takvim-ay-yil { font-size: 14px; font-weight: 700; color: #1c1c1e; }
+        .takvim-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+        .takvim-gun {
+            background: white; border-radius: 12px; padding: 7px 2px;
+            text-align: center; cursor: pointer; transition: all .14s;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06); min-height: 66px;
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+        }
+        .takvim-gun:active { transform: scale(.93); }
+        .takvim-gun.aktif  { background: #007aff; }
+        .takvim-gun.bugun .takvim-gun-no { color: #007aff; font-weight: 800; }
+        .takvim-gun.aktif .takvim-gun-adi,
+        .takvim-gun.aktif .takvim-gun-no  { color: white; }
+        .takvim-gun.aktif .takvim-badge   { background: white; color: #007aff; }
+        .takvim-gun-adi { font-size: 9px; font-weight: 700; color: #8e8e93; letter-spacing: .3px; }
+        .takvim-gun-no  { font-size: 16px; font-weight: 700; color: #1c1c1e; }
+        .takvim-badge {
+            background: #ff3b30; color: white; border-radius: 7px;
+            font-size: 9px; font-weight: 800; padding: 1px 5px; min-width: 16px;
+        }
+        .takvim-badge.bos { visibility: hidden; }
+        .takvim-gun-bilgi {
+            padding: 8px 16px 4px; font-size: 13px; color: #8e8e93; font-weight: 600;
+        }
 
         /* Mesajlar alt sayfa başlığı */
         .mesajlar-sub-header {
@@ -870,7 +907,10 @@
     <!-- Dashboard Header -->
     <div class="header" id="dashboardHeader">
         <div class="header-top">
-            <h1>Bilgi İşlem</h1>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <img id="kurumLogo" style="width:36px;height:36px;border-radius:10px;object-fit:cover;display:none;">
+                <h1>Bilgi İşlem</h1>
+            </div>
             <button onclick="ayarModalAc()" style="background:#f2f2f7;border:none;width:32px;height:32px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">⚙️</button>
         </div>
     </div>
@@ -911,6 +951,15 @@
             <button class="geri-btn" onclick="dashboardGoster()">‹ Geri</button>
             <span class="mesajlar-sub-baslik">Mesajlar</span>
             <span class="header-sayac" id="sayac">0 öğe</span>
+        </div>
+        <div class="takvim-bolum">
+            <div class="takvim-nav">
+                <button class="takvim-nav-btn" onclick="haftaDegistir(-1)">‹</button>
+                <span class="takvim-ay-yil" id="takvimAyYil"></span>
+                <button class="takvim-nav-btn" onclick="haftaDegistir(1)">›</button>
+            </div>
+            <div class="takvim-grid" id="takvimGrid"></div>
+            <div class="takvim-gun-bilgi" id="takvimGunBilgi"></div>
         </div>
         <div class="filtreler" style="padding:10px 16px 8px;">
             <button class="filtre-btn aktif" data-filtre="tumu"       onclick="filtreSecCli(this)">Tümü</button>
@@ -1073,6 +1122,19 @@
         <div style="background:#f2f2f7;border-radius:12px;padding:16px;font-size:14px;line-height:1.8;margin-bottom:16px;">
             <div id="ayarDurumMetin" style="color:#8e8e93;">Kontrol ediliyor...</div>
         </div>
+        <div style="margin-bottom:16px;">
+            <div style="font-size:12px;font-weight:700;color:#8e8e93;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Kurum Logosu</div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div id="ayarLogoYerTutucu" style="width:56px;height:56px;border-radius:14px;background:#f2f2f7;display:flex;align-items:center;justify-content:center;font-size:24px;border:1px solid #e5e5ea;flex-shrink:0;">🏢</div>
+                <img id="ayarLogoOnizleme" style="width:56px;height:56px;border-radius:14px;object-fit:cover;border:1px solid #e5e5ea;flex-shrink:0;display:none;">
+                <div>
+                    <button onclick="document.getElementById('logoInput').click()" style="background:#f2f2f7;border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;color:#007aff;">Logo Yükle</button>
+                    <input type="file" id="logoInput" accept=".jpg,.jpeg,.png,.gif,.webp,.svg" style="display:none;" onchange="logoSecildi(this)">
+                    <div style="font-size:11px;color:#8e8e93;margin-top:4px;">PNG, JPG, SVG — maks 500 KB</div>
+                </div>
+            </div>
+            <div id="logoYukleDurum" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
+        </div>
         <div style="font-size:13px;color:#8e8e93;line-height:1.8;">
             <b>Nasıl erişilir?</b><br>
             📱 Telefon: <code style="background:#f2f2f7;padding:2px 6px;border-radius:4px;">http://100.111.136.11:3001</code><br>
@@ -1107,12 +1169,12 @@
         <div id="yoklamaSinifBolumu" style="display:none;margin-top:16px;">
             <div style="font-size:12px;color:#8e8e93;margin-bottom:10px;">Her sınıf için WhatsApp veli grubunu seç:</div>
             <div id="yoklamaSinifListesi"></div>
-            <div style="display:flex;gap:8px;margin-top:14px;">
-                <button onclick="yoklamaAyarKaydet()" style="flex:1;padding:12px;background:#007aff;color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">Kaydet</button>
-                <button onclick="yoklamaSimdiGonder()" style="padding:12px 16px;background:#f2f2f7;color:#1c1c1e;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;" title="Şimdi test gönderimi yap">▶ Test</button>
-            </div>
-            <div id="yoklamaKayitDurum" style="font-size:12px;text-align:center;margin-top:8px;min-height:18px;"></div>
         </div>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+            <button onclick="yoklamaAyarKaydet()" style="flex:1;padding:12px;background:#007aff;color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">Kaydet</button>
+            <button onclick="yoklamaSimdiGonder()" style="padding:12px 16px;background:#f2f2f7;color:#1c1c1e;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;" title="Şimdi test gönderimi yap">▶ Test</button>
+        </div>
+        <div id="yoklamaKayitDurum" style="font-size:12px;text-align:center;margin-top:8px;min-height:18px;"></div>
     </div>
 </div>
 
@@ -1418,6 +1480,7 @@
     kilitAc = function() {
         _asılKilitAc();
         setTimeout(pushAbonelikKur, 1000);
+        logoYukle().catch(() => {});
     };
 
     // ── Sabitler & Durum ──────────────────────────────────────
@@ -1431,6 +1494,8 @@
     let gruplar           = [];
     let seciliGrupIdler   = [];
     let wpHazir           = false;
+    let secilenGun        = null;
+    let haftaOffset       = 0;
 
     // ── Başlangıç ────────────────────────────────────────────
     const bugun = new Date();
@@ -1528,6 +1593,8 @@
         let filtreli = tumVeri;
         if (aktifFiltre === "bekleyen")   filtreli = tumVeri.filter(x => !x.tamamlandi);
         if (aktifFiltre === "tamamlandi") filtreli = tumVeri.filter(x =>  x.tamamlandi);
+        if (secilenGun) filtreli = filtreli.filter(x => x.tarih === secilenGun);
+        takvimCiz();
 
         const bekleyen = tumVeri.filter(x => !x.tamamlandi).length;
         document.getElementById("sayac").textContent = bekleyen > 0 ? `${bekleyen} bekleyen` : "Hepsi tamam";
@@ -1983,9 +2050,12 @@
         document.getElementById('dashboardHeader').style.display = 'none';
         document.getElementById('panelGrid').style.display       = 'none';
         document.getElementById('mesajlarSayfa').style.display   = 'block';
+        takvimCiz();
     }
 
     function dashboardGoster() {
+        secilenGun  = null;
+        haftaOffset = 0;
         document.getElementById('dashboardHeader').style.display = 'block';
         document.getElementById('panelGrid').style.display       = 'grid';
         document.getElementById('mesajlarSayfa').style.display   = 'none';
@@ -2005,6 +2075,7 @@
     // ── Ayarlar ───────────────────────────────────────────────
     function ayarModalAc() {
         modalAcGoster('ayarOverlay');
+        logoAyarGoster();
         const durum = document.getElementById('ayarDurumMetin');
         durum.textContent = 'Kontrol ediliyor...';
         db.collection("durum").doc("whatsapp").get().then(snap => {
@@ -2096,6 +2167,140 @@
             durum.style.color = '#ff3b30';
             durum.textContent = '❌ ' + e.message;
         }
+    }
+
+    // ── Haftalık Takvim ───────────────────────────────────────
+    function getHaftaGunleri(offset) {
+        const simdi     = new Date();
+        const gunNo     = simdi.getDay();
+        const pazartesi = new Date(simdi);
+        pazartesi.setDate(simdi.getDate() - ((gunNo + 6) % 7) + offset * 7);
+        pazartesi.setHours(0, 0, 0, 0);
+        const gunler = [];
+        for (let i = 0; i < 7; i++) {
+            const g = new Date(pazartesi);
+            g.setDate(pazartesi.getDate() + i);
+            gunler.push(g);
+        }
+        return gunler;
+    }
+
+    function takvimCiz() {
+        const grid = document.getElementById('takvimGrid');
+        if (!grid) return;
+        const gunler    = getHaftaGunleri(haftaOffset);
+        const bugunIso  = new Date().toISOString().split('T')[0];
+        const gunAdlari = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+        const ilk = gunler[0], son = gunler[6];
+        let ayYil;
+        if (ilk.getMonth() === son.getMonth()) {
+            ayYil = ilk.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+        } else {
+            ayYil = ilk.toLocaleDateString('tr-TR', { month: 'short' }) + ' – ' +
+                    son.toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' });
+        }
+        const ayYilEl = document.getElementById('takvimAyYil');
+        if (ayYilEl) ayYilEl.textContent = ayYil;
+
+        grid.innerHTML = gunler.map((g, i) => {
+            const iso      = g.toISOString().split('T')[0];
+            const bugunMu  = iso === bugunIso;
+            const seciliMu = iso === secilenGun;
+            const bekleyen = tumVeri.filter(x => x.tarih === iso && !x.tamamlandi).length;
+            return `<div class="takvim-gun${bugunMu ? ' bugun' : ''}${seciliMu ? ' aktif' : ''}" onclick="gunSec('${iso}')">
+                <div class="takvim-gun-adi">${gunAdlari[i]}</div>
+                <div class="takvim-gun-no">${g.getDate()}</div>
+                <div class="takvim-badge${bekleyen === 0 ? ' bos' : ''}">${bekleyen > 0 ? bekleyen : '·'}</div>
+            </div>`;
+        }).join('');
+
+        const bilgiEl = document.getElementById('takvimGunBilgi');
+        if (bilgiEl) {
+            if (secilenGun) {
+                const tarih = new Date(secilenGun + 'T00:00:00');
+                const sayi  = tumVeri.filter(x => x.tarih === secilenGun).length;
+                bilgiEl.textContent = tarih.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' }) +
+                    (sayi > 0 ? ` — ${sayi} mesaj` : ' — mesaj yok');
+            } else {
+                bilgiEl.textContent = '';
+            }
+        }
+    }
+
+    function gunSec(iso) {
+        secilenGun = secilenGun === iso ? null : iso;
+        listeyiGuncelle();
+    }
+
+    function haftaDegistir(delta) {
+        haftaOffset += delta;
+        takvimCiz();
+    }
+
+    // ── Kurum Logosu ──────────────────────────────────────────
+    async function logoYukle() {
+        try {
+            const snap = await db.collection('ayarlar').doc('logo').get();
+            if (snap.exists && snap.data()?.data) logoGoster(snap.data().data);
+        } catch(e) {}
+    }
+
+    function logoGoster(src) {
+        const logo = document.getElementById('kurumLogo');
+        if (logo && src) { logo.src = src; logo.style.display = 'block'; }
+    }
+
+    function logoAyarGoster() {
+        db.collection('ayarlar').doc('logo').get().then(snap => {
+            const onizleme  = document.getElementById('ayarLogoOnizleme');
+            const yerTutucu = document.getElementById('ayarLogoYerTutucu');
+            if (!onizleme || !yerTutucu) return;
+            if (snap.exists && snap.data()?.data) {
+                onizleme.src            = snap.data().data;
+                onizleme.style.display  = 'block';
+                yerTutucu.style.display = 'none';
+            } else {
+                onizleme.style.display  = 'none';
+                yerTutucu.style.display = 'flex';
+            }
+        }).catch(() => {});
+    }
+
+    function logoSecildi(input) {
+        const dosya = input.files[0];
+        if (!dosya) return;
+        if (dosya.size > 512 * 1024) {
+            alert('Logo 500 KB\'den büyük olamaz.');
+            input.value = '';
+            return;
+        }
+        const durum = document.getElementById('logoYukleDurum');
+        durum.style.color = '#8e8e93';
+        durum.textContent = 'Yükleniyor...';
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const base64 = e.target.result;
+                await db.collection('ayarlar').doc('logo').set({
+                    data: base64,
+                    mime: dosya.type,
+                    ad:   dosya.name,
+                    ts:   firebase.firestore.FieldValue.serverTimestamp()
+                });
+                logoGoster(base64);
+                const onizleme  = document.getElementById('ayarLogoOnizleme');
+                const yerTutucu = document.getElementById('ayarLogoYerTutucu');
+                if (onizleme)  { onizleme.src = base64; onizleme.style.display = 'block'; }
+                if (yerTutucu) { yerTutucu.style.display = 'none'; }
+                durum.style.color = '#34c759';
+                durum.textContent = '✅ Logo güncellendi';
+                setTimeout(() => { durum.textContent = ''; }, 2500);
+            } catch(err) {
+                durum.style.color = '#ff3b30';
+                durum.textContent = '❌ ' + err.message;
+            }
+        };
+        reader.readAsDataURL(dosya);
     }
 
     // ── Modal Yönetimi ────────────────────────────────────────
