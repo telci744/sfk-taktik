@@ -911,7 +911,10 @@
                 <img id="kurumLogo" style="width:36px;height:36px;border-radius:10px;object-fit:cover;display:none;">
                 <h1>Bilgi İşlem</h1>
             </div>
-            <button onclick="ayarModalAc()" style="background:#f2f2f7;border:none;width:32px;height:32px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">⚙️</button>
+            <div style="display:flex;gap:8px;">
+                <button onclick="ayarModalAc()" style="background:#f2f2f7;border:none;width:32px;height:32px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">⚙️</button>
+                <button onclick="cikisYap()" style="background:#ffe5e5;border:none;width:32px;height:32px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Çıkış">🔒</button>
+            </div>
         </div>
     </div>
 
@@ -2079,6 +2082,12 @@
     }
 
     // ── Ayarlar ───────────────────────────────────────────────
+    function cikisYap() {
+        sessionStorage.removeItem('mavikonak_giris');
+        document.getElementById('kilitEkran').style.display = 'flex';
+        kilitEkraniGoster('giris_pin');
+    }
+
     function ayarModalAc() {
         modalAcGoster('ayarOverlay');
         logoAyarGoster();
