@@ -469,7 +469,7 @@ async function yoklamaRaporuGonder() {
             const mesaj = `🏫 *${sinif} — Okul Dönüş*\n📅 ${tarihStr}\n\n${satirlar.join('\n')}\n\n${'─'.repeat(16)}\n${ozetParcalar.join('  |  ')}\nToplam: ${ogrenciler.length} öğrenci`;
 
             await sock.sendMessage(grupId, { text: mesaj });
-            console.log(`  ✅ ${sinif} → ${geldi} geldi, ${gelmedi} gelmedi, ${kayitYok} kayıtsız`);
+            console.log(`  ✅ ${sinif} → ${dondu} döndü, ${gelmedi} gelmedi, ${kayitsiz} kayıtsız`);
             if (ogrenciler !== Object.values(siniflar).at(-1)) await new Promise(r => setTimeout(r, 3000));
         }
 
