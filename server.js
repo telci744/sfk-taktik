@@ -385,23 +385,30 @@ let _mavikentTokenExp = 0;
 
 async function mavikentAnon() {
     if (_mavikentToken && Date.now() < _mavikentTokenExp) return _mavikentToken;
-    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInAnonymously?key=${MAVIKENT_APIKEY}`, {
+    const r    = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${MAVIKENT_APIKEY}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ returnSecureToken: true })
     });
-    const d = await r.json();
-    if (!d.idToken) throw new Error('Mavikent anonim giriş başarısız: ' + JSON.stringify(d));
+    const text = await r.text();
+    let d;
+    try { d = JSON.parse(text); } catch(e) { throw new Error('Mavikent auth yanıtı JSON değil: ' + text.slice(0, 100)); }
+    if (!d.idToken) throw new Error('Mavikent anonim giriş başarısız: ' + JSON.stringify(d).slice(0, 200));
     _mavikentToken    = d.idToken;
     _mavikentTokenExp = Date.now() + (Number(d.expiresIn) - 120) * 1000;
     return _mavikentToken;
 }
 
 async function mavikentRtdb(path) {
-    const token       = await mavikentAnon();
     const encodedPath = path.split('/').map(encodeURIComponent).join('/');
-    const r = await fetch(`${MAVIKENT_RTDB}/mavikent_premium/${encodedPath}.json?auth=${token}`);
-    if (!r.ok) throw new Error(`Mavikent RTDB ${r.status}: ${await r.text()}`);
-    return r.json();
+    const r    = await fetch(`${MAVIKENT_RTDB}/mavikent_premium/${encodedPath}.json`);
+    const text = await r.text();
+    if (!r.ok) throw new Error(`Mavikent RTDB ${r.status}: ${text.slice(0, 300)}`);
+    try {
+        return JSON.parse(text);
+    } catch(e) {
+        const ozet = text.replace(/<[^>]+>/g, '').trim().slice(0, 120);
+        throw new Error(`RTDB yanıtı JSON değil: ${ozet}`);
+    }
 }
 
 // ── Yoklama raporu (22:30 otomatik) ────────────────────────────
