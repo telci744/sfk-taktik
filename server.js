@@ -246,12 +246,18 @@ let isleniyor = false;
 async function isKontrol() {
     if (!hazir || isleniyor) return;
 
-    // Manuel yoklama tetikleme kontrolü
+    // Manuel slot tetikleme kontrolü
     try {
         const tetikle = await fsGet('yoklama_ayarlari', 'tetikle').catch(() => null);
         if (tetikle?.istek) {
             await fsUpdate('yoklama_ayarlari', 'tetikle', { istek: false });
-            yoklamaRaporuGonder().catch(e => console.error('Manuel yoklama hatası:', e.message));
+            const slotId  = tetikle.slotId || 'okulDonus';
+            const ayarlar = await fsGet('yoklama_ayarlari', 'ayarlar').catch(() => null);
+            let slot = ayarlar?.slots?.[slotId];
+            if (!slot && slotId === 'okulDonus' && ayarlar?.aktif !== undefined) {
+                slot = { aktif: true, saat: '17:00', siniflar: ayarlar.siniflar || {} };
+            }
+            if (slot) slotRaporuGonder(slotId, slot).catch(e => console.error(`Manuel ${slotId} hatası:`, e.message));
         }
     } catch { /* yoksay */ }
 
@@ -411,14 +417,17 @@ async function mavikentRtdb(path) {
     }
 }
 
-// ── Okul dönüş raporu (17:00 otomatik) ────────────────────────
-let yoklamaGonderildiGun = '';
+// ── Slot dispatcher ────────────────────────────────────────────
+async function slotRaporuGonder(slotId, slotAyar) {
+    if (slotId === 'okulDonus')      return okulDonusRaporuGonder(slotAyar);
+    if (slotId === 'odevTakibi')     return odevTakibiRaporuGonder(slotAyar);
+    if (slotId === 'yaziliHazirlik') return yaziliHazirlikRaporuGonder(slotAyar);
+}
 
-async function yoklamaRaporuGonder() {
+// ── Okul dönüş raporu ──────────────────────────────────────────
+async function okulDonusRaporuGonder(slotAyar) {
     try {
-        const ayarlar = await fsGet('yoklama_ayarlari', 'ayarlar').catch(() => null);
-        if (!ayarlar?.aktif) return;
-        const sinifGruplar = ayarlar.siniflar || {};
+        const sinifGruplar = slotAyar.siniflar || {};
         if (!Object.values(sinifGruplar).some(Boolean)) return;
 
         const todayStr = new Date().toDateString();
@@ -435,7 +444,6 @@ async function yoklamaRaporuGonder() {
             : Object.values(rosterRaw || {}).filter(Boolean);
         if (!roster.length) { console.log('Okul dönüş: roster boş'); return; }
 
-        // Sınıflara göre grupla
         const siniflar = {};
         for (const ogrenci of roster) {
             const sinif = studentClasses?.[ogrenci];
@@ -463,7 +471,7 @@ async function yoklamaRaporuGonder() {
             }
 
             const ozetParcalar = [`✅ ${dondu} döndü`, `❌ ${gelmedi} gelmedi`];
-            if (izinli  > 0) ozetParcalar.push(`🏖️ ${izinli} izinli`);
+            if (izinli   > 0) ozetParcalar.push(`🏖️ ${izinli} izinli`);
             if (kayitsiz > 0) ozetParcalar.push(`➖ ${kayitsiz} kayıtsız`);
 
             const mesaj = `🏫 *${sinif} — Okul Dönüş*\n📅 ${tarihStr}\n\n${satirlar.join('\n')}\n\n${'─'.repeat(16)}\n${ozetParcalar.join('  |  ')}\nToplam: ${ogrenciler.length} öğrenci`;
@@ -476,24 +484,34 @@ async function yoklamaRaporuGonder() {
         const sinifSayisi = Object.keys(siniflar).length;
         bildirimGonder('🏫 Okul Dönüş Gönderildi', `${sinifSayisi} sınıfın okul dönüş yoklaması velilere iletildi.`).catch(() => {});
     } catch(e) {
-        console.error('Yoklama raporu hatası:', e.message);
-        bildirimGonder('❌ Yoklama Hatası', e.message).catch(() => {});
+        console.error('Okul dönüş raporu hatası:', e.message);
+        bildirimGonder('❌ Okul Dönüş Hatası', e.message).catch(() => {});
     }
 }
 
-// ── 23:00 Günlük özet & 22:30 Yoklama ────────────────────────
+// ── Ödev takibi raporu (yakında) ──────────────────────────────
+async function odevTakibiRaporuGonder(slotAyar) {
+    console.log('📚 Ödev takibi raporu tetiklendi (henüz implemente edilmedi)');
+    bildirimGonder('📚 Ödev Takibi', 'Bu özellik yakında aktifleştirilecek.').catch(() => {});
+}
+
+// ── Yazılı hazırlık raporu (yakında) ──────────────────────────
+async function yaziliHazirlikRaporuGonder(slotAyar) {
+    console.log('📝 Yazılı hazırlık raporu tetiklendi (henüz implemente edilmedi)');
+    bildirimGonder('📝 Yazılı Hazırlık', 'Bu özellik yakında aktifleştirilecek.').catch(() => {});
+}
+
+// ── Zamanlanmış slot kontrol & 23:00 özet ─────────────────────
 let ozetGonderildiGun = '';
-setInterval(() => {
-    const simdi  = new Date();
-    const bugun  = simdi.toISOString().split('T')[0];
-    const sa     = simdi.getHours();
-    const dk     = simdi.getMinutes();
+const slotGonderildiGun = {};
 
-    if (sa === 17 && dk === 0 && yoklamaGonderildiGun !== bugun) {
-        yoklamaGonderildiGun = bugun;
-        yoklamaRaporuGonder().catch(e => console.error('Okul dönüş tetikleme hatası:', e.message));
-    }
+async function slotZamanKontrol() {
+    const simdi = new Date();
+    const bugun = simdi.toISOString().split('T')[0];
+    const sa    = simdi.getHours();
+    const dk    = simdi.getMinutes();
 
+    // 23:00 günlük özet
     if (sa === 23 && dk < 1 && ozetGonderildiGun !== bugun) {
         ozetGonderildiGun = bugun;
         const { gonderilenler, hatalar } = gunStats;
@@ -502,7 +520,35 @@ setInterval(() => {
             : 'Bugün hiç mesaj gönderilmedi.';
         bildirimGonder('📊 Günlük Özet', mesaj).catch(() => {});
     }
-}, 30000);
+
+    if (!hazir) return;
+
+    // Her slot için zaman kontrolü
+    try {
+        const ayarlar = await fsGet('yoklama_ayarlari', 'ayarlar').catch(() => null);
+        if (!ayarlar) return;
+
+        let slots = ayarlar.slots;
+        // Eski format backward compat
+        if (!slots && ayarlar.aktif !== undefined) {
+            slots = { okulDonus: { aktif: ayarlar.aktif, saat: '17:00', siniflar: ayarlar.siniflar || {} } };
+        }
+        if (!slots) return;
+
+        for (const [slotId, slot] of Object.entries(slots)) {
+            if (!slot?.aktif || !slot?.saat) continue;
+            const [slotSa, slotDk] = slot.saat.split(':').map(Number);
+            if (sa === slotSa && dk === slotDk && slotGonderildiGun[slotId] !== bugun) {
+                slotGonderildiGun[slotId] = bugun;
+                slotRaporuGonder(slotId, slot).catch(e => console.error(`${slotId} rapor hatası:`, e.message));
+            }
+        }
+    } catch(e) {
+        console.error('Slot zaman kontrol hatası:', e.message);
+    }
+}
+
+setInterval(slotZamanKontrol, 30000);
 
 console.log('⏳ WhatsApp başlatılıyor...');
 baslat().catch(console.error);

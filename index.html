@@ -795,6 +795,44 @@
             padding: 8px 16px 4px; font-size: 13px; color: #8e8e93; font-weight: 600;
         }
 
+        /* ── Veli Slot Kartları ── */
+        .veli-slot-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .veli-slot {
+            background: white;
+            border-radius: 16px;
+            padding: 16px 10px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px solid #e5e5ea;
+            transition: all .14s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            min-height: 88px;
+            justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .veli-slot:active { transform: scale(.95); }
+        .veli-slot.aktif  { border-color: #34c759; background: #f0fff4; }
+        .veli-slot.secili { border-color: #007aff; background: #f0f7ff; }
+        .veli-slot.devre-disi { opacity: .4; cursor: not-allowed; }
+        .veli-slot .slot-ikon { font-size: 24px; }
+        .veli-slot .slot-ad   { font-size: 12px; font-weight: 800; color: #1c1c1e; }
+        .veli-slot .slot-durum { font-size: 11px; font-weight: 600; color: #8e8e93; }
+        .slot-ayar-bolum {
+            border-top: 1px solid #e5e5ea;
+            padding-top: 16px;
+            margin-top: 4px;
+        }
+        .slot-ayar-baslik { font-size: 14px; font-weight: 800; color: #1c1c1e; margin-bottom: 12px; }
+
         /* Mesajlar alt sayfa başlığı */
         .mesajlar-sub-header {
             display: flex; align-items: center;
@@ -1157,28 +1195,61 @@
             <h2>🏫 Veli Bilgilendirme</h2>
             <button class="btn-kapat-modal" onclick="modalKapat('veliOverlay')">✕</button>
         </div>
-        <div style="background:#fff7ed;border-radius:12px;padding:14px 16px;font-size:13px;color:#92400e;margin-bottom:16px;line-height:1.6;">
-            Her gün <b>17:00</b>'da Mavikent v2'den okul dönüş verileri çekilir ve seçili veli gruplarına sınıf bazlı gönderilir.
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <div>
-                <div style="font-weight:700;font-size:14px;">Otomatik Gönderim</div>
-                <div style="font-size:11px;color:#8e8e93;margin-top:2px;">Aktif olduğunda her gün çalışır</div>
+
+        <!-- 4 slot grid -->
+        <div class="veli-slot-grid">
+            <div class="veli-slot" id="slotKarti_okulDonus" onclick="slotSec('okulDonus')">
+                <div class="slot-ikon">🏫</div>
+                <div class="slot-ad">Okul Dönüş</div>
+                <div class="slot-durum" id="slotDurum_okulDonus">Yükleniyor...</div>
             </div>
-            <label class="toggle-sw">
-                <input type="checkbox" id="yoklamaAktif" onchange="yoklamaToggle()">
-                <span class="toggle-slider"></span>
-            </label>
+            <div class="veli-slot" id="slotKarti_odevTakibi" onclick="slotSec('odevTakibi')">
+                <div class="slot-ikon">📚</div>
+                <div class="slot-ad">Ödev Takibi</div>
+                <div class="slot-durum" id="slotDurum_odevTakibi">Yükleniyor...</div>
+            </div>
+            <div class="veli-slot" id="slotKarti_yaziliHazirlik" onclick="slotSec('yaziliHazirlik')">
+                <div class="slot-ikon">📝</div>
+                <div class="slot-ad">Yazılı Hazırlık</div>
+                <div class="slot-durum" id="slotDurum_yaziliHazirlik">Yükleniyor...</div>
+            </div>
+            <div class="veli-slot devre-disi">
+                <div class="slot-ikon">🔜</div>
+                <div class="slot-ad" style="color:#8e8e93;">—</div>
+                <div class="slot-durum">Yakında</div>
+            </div>
         </div>
-        <div id="yoklamaSinifBolumu" style="display:none;margin-top:16px;">
-            <div style="font-size:12px;color:#8e8e93;margin-bottom:10px;">Her sınıf için WhatsApp veli grubunu seç:</div>
-            <div id="yoklamaSinifListesi"></div>
+
+        <!-- Seçili slot ayarları -->
+        <div id="slotAyarBolum" style="display:none;" class="slot-ayar-bolum">
+            <div class="slot-ayar-baslik" id="slotAyarBaslik"></div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <div>
+                    <div style="font-weight:700;font-size:13px;">Otomatik Gönderim</div>
+                    <div style="font-size:11px;color:#8e8e93;margin-top:2px;">Aktif olduğunda belirlenen saatte çalışır</div>
+                </div>
+                <label class="toggle-sw">
+                    <input type="checkbox" id="slotAktifToggle" onchange="slotToggle()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div id="slotDetayBolum" style="display:none;margin-top:14px;">
+                <div style="display:flex;align-items:center;gap:10px;background:#f9f9fb;border-radius:12px;padding:12px 14px;margin-bottom:12px;">
+                    <span style="font-size:13px;font-weight:700;color:#1c1c1e;flex-shrink:0;">Gönderim Saati</span>
+                    <input type="time" id="slotSaatInput" style="flex:1;padding:8px 10px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:15px;font-weight:700;background:white;color:#1c1c1e;outline:none;">
+                </div>
+                <div style="font-size:12px;color:#8e8e93;margin-bottom:10px;">Her sınıf için WhatsApp veli grubunu seç:</div>
+                <div id="slotSinifListesi"></div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:14px;">
+                <button onclick="slotKaydet()" style="flex:1;padding:12px;background:#007aff;color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">Kaydet</button>
+                <button onclick="slotTestGonder()" style="padding:12px 16px;background:#f2f2f7;color:#1c1c1e;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;" title="Şimdi test gönderimi yap">▶ Test</button>
+            </div>
+            <div id="slotKayitDurum" style="font-size:12px;text-align:center;margin-top:8px;min-height:18px;"></div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:14px;">
-            <button onclick="yoklamaAyarKaydet()" style="flex:1;padding:12px;background:#007aff;color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">Kaydet</button>
-            <button onclick="yoklamaSimdiGonder()" style="padding:12px 16px;background:#f2f2f7;color:#1c1c1e;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;" title="Şimdi test gönderimi yap">▶ Test</button>
-        </div>
-        <div id="yoklamaKayitDurum" style="font-size:12px;text-align:center;margin-top:8px;min-height:18px;"></div>
     </div>
 </div>
 
@@ -1378,7 +1449,10 @@
         db.collection('yoklama_ayarlari').doc('ayarlar').get().then(snap => {
             const v = snap.exists ? snap.data() : {};
             const el = document.getElementById('panelVeliDurum');
-            if (el) el.textContent = v.aktif ? '✅ Aktif — her gün 17:00' : 'Okul dönüş 17:00';
+            if (!el) return;
+            const slots = v.slots || (v.aktif ? { okulDonus: { aktif: true } } : {});
+            const aktifSayisi = Object.values(slots).filter(s => s?.aktif).length;
+            el.textContent = aktifSayisi > 0 ? `✅ ${aktifSayisi} bildirim aktif` : 'Otomatik bildirimler';
         }).catch(() => {});
     }
 
@@ -1506,6 +1580,8 @@
     let wpHazir           = false;
     let secilenGun        = null;
     let haftaOffset       = 0;
+    let aktifSlot         = null;
+    let slotVerisi        = {};
 
     // ── Başlangıç ────────────────────────────────────────────
     const bugun = new Date();
@@ -2073,13 +2149,14 @@
 
     function veliModalAc() {
         modalAcGoster('veliOverlay');
-        yoklamaAyarYukle();
-        // Panel alt yazısını güncelle
-        db.collection('yoklama_ayarlari').doc('ayarlar').get().then(snap => {
-            const v = snap.exists ? snap.data() : {};
-            document.getElementById('panelVeliDurum').textContent =
-                v.aktif ? '✅ Aktif — her gün 17:00' : 'Okul dönüş 17:00';
-        }).catch(() => {});
+        // Slot seçimini sıfırla
+        aktifSlot = null;
+        document.getElementById('slotAyarBolum').style.display = 'none';
+        for (const k of Object.keys(SLOT_BILGI)) {
+            const el = document.getElementById(`slotKarti_${k}`);
+            if (el) el.classList.remove('secili');
+        }
+        veliSlotlariYukle();
     }
 
     // ── Ayarlar ───────────────────────────────────────────────
@@ -2112,10 +2189,16 @@
         modalKapat('ayarOverlay');
     }
 
-    // ── Yoklama Raporu Ayarları ───────────────────────────────
+    // ── Veli Bilgilendirme Slot Sistemi ──────────────────────
     const YOKLAMA_SINIFLAR = ['5. Sınıf', '6. Sınıf', '7. Sınıf', '8. Sınıf', 'ELİT', 'STANDART'];
 
-    async function yoklamaAyarYukle() {
+    const SLOT_BILGI = {
+        okulDonus:      { ad: 'Okul Dönüş',     ikon: '🏫', varsayilanSaat: '17:00' },
+        odevTakibi:     { ad: 'Ödev Takibi',     ikon: '📚', varsayilanSaat: '20:00' },
+        yaziliHazirlik: { ad: 'Yazılı Hazırlık', ikon: '📝', varsayilanSaat: '19:00' }
+    };
+
+    async function veliSlotlariYukle() {
         try {
             const [yokSnap, grupSnap] = await Promise.all([
                 db.collection('yoklama_ayarlari').doc('ayarlar').get(),
@@ -2123,62 +2206,122 @@
             ]);
             const veri    = yokSnap.exists ? (yokSnap.data() || {}) : {};
             const gruplar = grupSnap.exists ? (grupSnap.data()?.items || []) : [];
+            window._veliGruplar = gruplar;
 
-            document.getElementById('yoklamaAktif').checked = !!veri.aktif;
-            document.getElementById('yoklamaSinifBolumu').style.display = veri.aktif ? 'block' : 'none';
+            // Yeni yapı veya eski formattan migrate
+            slotVerisi = veri.slots ? { ...veri.slots } : {};
+            if (!slotVerisi.okulDonus && veri.aktif !== undefined) {
+                slotVerisi.okulDonus = { aktif: !!veri.aktif, saat: '17:00', siniflar: veri.siniflar || {} };
+            }
 
-            const sinifGruplar = veri.siniflar || {};
-            const listesi = document.getElementById('yoklamaSinifListesi');
-            listesi.innerHTML = YOKLAMA_SINIFLAR.map(sinif => `
-                <div style="margin-bottom:10px;">
-                    <div style="font-size:12px;font-weight:700;color:#1c1c1e;margin-bottom:4px;">${sinif}</div>
-                    <select data-sinif="${sinif}" style="width:100%;padding:9px 10px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:13px;background:white;color:#1c1c1e;">
-                        <option value="">— Grup seç —</option>
-                        ${gruplar.map(g => `<option value="${g.id}" ${sinifGruplar[sinif] === g.id ? 'selected' : ''}>${g.ad}</option>`).join('')}
-                    </select>
-                </div>
-            `).join('');
+            // Slot kartlarını güncelle
+            for (const [id, bilgi] of Object.entries(SLOT_BILGI)) {
+                const slot    = slotVerisi[id] || {};
+                const durumEl = document.getElementById(`slotDurum_${id}`);
+                const kartiEl = document.getElementById(`slotKarti_${id}`);
+                if (durumEl) {
+                    if (slot.aktif) {
+                        durumEl.textContent  = `✅ ${slot.saat || bilgi.varsayilanSaat}`;
+                        durumEl.style.color  = '#34c759';
+                    } else {
+                        durumEl.textContent  = 'Pasif';
+                        durumEl.style.color  = '#8e8e93';
+                    }
+                }
+                if (kartiEl) kartiEl.classList.toggle('aktif', !!slot.aktif);
+            }
         } catch(e) {
-            console.error('Yoklama ayar yükleme:', e);
+            console.error('Slot yükleme hatası:', e);
         }
     }
 
-    function yoklamaToggle() {
-        const aktif = document.getElementById('yoklamaAktif').checked;
-        document.getElementById('yoklamaSinifBolumu').style.display = aktif ? 'block' : 'none';
+    function slotSec(id) {
+        aktifSlot = id;
+        const bilgi = SLOT_BILGI[id];
+        const slot  = slotVerisi[id] || {};
+
+        // Kart seçim görünümü
+        for (const k of Object.keys(SLOT_BILGI)) {
+            const el = document.getElementById(`slotKarti_${k}`);
+            if (el) el.classList.toggle('secili', k === id);
+        }
+
+        document.getElementById('slotAyarBaslik').textContent = `${bilgi.ikon} ${bilgi.ad}`;
+        document.getElementById('slotAktifToggle').checked    = !!slot.aktif;
+        document.getElementById('slotSaatInput').value        = slot.saat || bilgi.varsayilanSaat;
+        document.getElementById('slotDetayBolum').style.display = slot.aktif ? 'block' : 'none';
+        document.getElementById('slotKayitDurum').textContent  = '';
+
+        slotSinifListesiniCiz(slot.siniflar || {});
+        document.getElementById('slotAyarBolum').style.display = 'block';
     }
 
-    async function yoklamaSimdiGonder() {
-        const durum = document.getElementById('yoklamaKayitDurum');
+    function slotToggle() {
+        const aktif = document.getElementById('slotAktifToggle').checked;
+        document.getElementById('slotDetayBolum').style.display = aktif ? 'block' : 'none';
+    }
+
+    function slotSinifListesiniCiz(sinifGruplar) {
+        const gruplar = window._veliGruplar || [];
+        document.getElementById('slotSinifListesi').innerHTML = YOKLAMA_SINIFLAR.map(sinif => `
+            <div style="margin-bottom:10px;">
+                <div style="font-size:12px;font-weight:700;color:#1c1c1e;margin-bottom:4px;">${sinif}</div>
+                <select data-sinif="${sinif}" style="width:100%;padding:9px 10px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:13px;background:white;color:#1c1c1e;">
+                    <option value="">— Grup seç —</option>
+                    ${gruplar.map(g => `<option value="${g.id}" ${sinifGruplar[sinif] === g.id ? 'selected' : ''}>${guvenliFirat(g.ad)}</option>`).join('')}
+                </select>
+            </div>
+        `).join('');
+    }
+
+    async function slotKaydet() {
+        if (!aktifSlot) return;
+        const aktif    = document.getElementById('slotAktifToggle').checked;
+        const saat     = document.getElementById('slotSaatInput').value;
+        const siniflar = {};
+        document.querySelectorAll('#slotSinifListesi select').forEach(sel => {
+            if (sel.value) siniflar[sel.dataset.sinif] = sel.value;
+        });
+
+        slotVerisi[aktifSlot] = { aktif, saat, siniflar };
+
+        const durum = document.getElementById('slotKayitDurum');
         durum.style.color = '#8e8e93';
-        durum.textContent = 'Tetikleniyor...';
+        durum.textContent = 'Kaydediliyor...';
         try {
-            await db.collection('yoklama_ayarlari').doc('tetikle').set({ istek: true, ts: Date.now() });
-            durum.style.color = '#ff9500';
-            durum.textContent = '⏳ Sunucu işliyor (~30 sn)...';
-            setTimeout(() => { durum.textContent = ''; }, 35000);
+            await db.collection('yoklama_ayarlari').doc('ayarlar').set({ slots: slotVerisi }, { merge: true });
+
+            // Kart güncelle
+            const bilgi   = SLOT_BILGI[aktifSlot];
+            const durumEl = document.getElementById(`slotDurum_${aktifSlot}`);
+            const kartiEl = document.getElementById(`slotKarti_${aktifSlot}`);
+            if (durumEl) { durumEl.textContent = aktif ? `✅ ${saat}` : 'Pasif'; durumEl.style.color = aktif ? '#34c759' : '#8e8e93'; }
+            if (kartiEl) kartiEl.classList.toggle('aktif', aktif);
+
+            // Panel alt yazı
+            const aktifSayisi = Object.values(slotVerisi).filter(s => s?.aktif).length;
+            const el = document.getElementById('panelVeliDurum');
+            if (el) el.textContent = aktifSayisi > 0 ? `✅ ${aktifSayisi} bildirim aktif` : 'Otomatik bildirimler';
+
+            durum.style.color = '#34c759';
+            durum.textContent = '✅ Kaydedildi';
+            setTimeout(() => { durum.textContent = ''; }, 2000);
         } catch(e) {
             durum.style.color = '#ff3b30';
             durum.textContent = '❌ ' + e.message;
         }
     }
 
-    async function yoklamaAyarKaydet() {
-        const aktif     = document.getElementById('yoklamaAktif').checked;
-        const siniflar  = {};
-        document.querySelectorAll('#yoklamaSinifListesi select').forEach(sel => {
-            if (sel.value) siniflar[sel.dataset.sinif] = sel.value;
-        });
-        const durum = document.getElementById('yoklamaKayitDurum');
+    async function slotTestGonder() {
+        if (!aktifSlot) return;
+        const durum = document.getElementById('slotKayitDurum');
         durum.style.color = '#8e8e93';
-        durum.textContent = 'Kaydediliyor...';
+        durum.textContent = 'Tetikleniyor...';
         try {
-            await db.collection('yoklama_ayarlari').doc('ayarlar').set({ aktif, siniflar });
-            durum.style.color = '#34c759';
-            durum.textContent = '✅ Kaydedildi';
-            setTimeout(() => { durum.textContent = ''; }, 2000);
-            const el = document.getElementById('panelVeliDurum');
-            if (el) el.textContent = aktif ? '✅ Aktif — her gün 17:00' : 'Okul dönüş 17:00';
+            await db.collection('yoklama_ayarlari').doc('tetikle').set({ istek: true, slotId: aktifSlot, ts: Date.now() });
+            durum.style.color = '#ff9500';
+            durum.textContent = '⏳ Sunucu işliyor (~30 sn)...';
+            setTimeout(() => { durum.textContent = ''; }, 35000);
         } catch(e) {
             durum.style.color = '#ff3b30';
             durum.textContent = '❌ ' + e.message;
