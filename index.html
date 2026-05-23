@@ -1529,11 +1529,10 @@
     kilitBaslat();
 
     // ── Web Push bildirimleri ─────────────────────────────────
-    const VAPID_PUBLIC = 'BMf7FqKbLe6QrIL7PonKODsM7DgGRoANWRgNS41PwWsGPFsDffL8Mq-siQUlYtv0RbJwr88VrD2CuySkMLhBkDs';
-
     async function pushAbonelikKur() {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
         try {
+            const { key: VAPID_PUBLIC } = await fetch('/api/vapid-public').then(r => r.json());
             const reg  = await navigator.serviceWorker.register('/sw.js');
             const izin = await Notification.requestPermission();
             if (izin !== 'granted') return;
@@ -1542,7 +1541,12 @@
                 applicationServerKey: VAPID_PUBLIC
             });
             const j = sub.toJSON();
-            await db.collection('ayarlar').doc('push').set({
+            let cihazId = localStorage.getItem('cihazId');
+            if (!cihazId) {
+                cihazId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+                localStorage.setItem('cihazId', cihazId);
+            }
+            await db.collection('abonelikler').doc(cihazId).set({
                 endpoint: j.endpoint,
                 p256dh:   j.keys.p256dh,
                 auth:     j.keys.auth

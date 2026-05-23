@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const express  = require('express');
 const cors     = require('cors');
@@ -12,14 +13,16 @@ const FIREBASE_PROJECT = 'sfk-taktik';
 const FIREBASE_API_KEY = 'AIzaSyD_zEbZek8IyacdHojnBpb4cWTIvBSdOtk';
 const FS_BASE          = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents`;
 
-const VAPID_PUBLIC  = 'BMf7FqKbLe6QrIL7PonKODsM7DgGRoANWRgNS41PwWsGPFsDffL8Mq-siQUlYtv0RbJwr88VrD2CuySkMLhBkDs';
-const VAPID_PRIVATE = 'EJmg0lOVdbhdXIb7Vu1fiwfvTCxPKZRgglCQleBGUKA';
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC;
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE;
 webpush.setVapidDetails('mailto:sfk@mavikonak.app', VAPID_PUBLIC, VAPID_PRIVATE);
 
 const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(express.static(__dirname, { index: 'index.html' }));
+
+app.get('/api/vapid-public', (_req, res) => res.json({ key: VAPID_PUBLIC }));
 
 const authDir = path.join(__dirname, 'auth_info');
 if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
@@ -118,18 +121,35 @@ async function fsDelete(col, doc) {
     await fetch(`${FS_BASE}/${col}/${doc}?key=${FIREBASE_API_KEY}`, { method: 'DELETE' });
 }
 
+async function fsList(col) {
+    const r = await fetch(`${FS_BASE}/${col}?key=${FIREBASE_API_KEY}`);
+    if (!r.ok) return [];
+    const data = await r.json();
+    if (!data.documents) return [];
+    return data.documents.map(d => ({ _id: d.name.split('/').pop(), ...fieldsToObj(d.fields) }));
+}
+
 // ── Web Push bildirimleri ─────────────────────────────────────
 async function bildirimGonder(baslik, mesaj) {
     try {
-        const ayarlar = await fsGet('ayarlar', 'push');
-        if (!ayarlar?.endpoint) return;
-        const sub = { endpoint: ayarlar.endpoint, keys: { p256dh: ayarlar.p256dh, auth: ayarlar.auth } };
-        await webpush.sendNotification(sub, JSON.stringify({ baslik, mesaj }));
+        const abonelikler = await fsList('abonelikler');
+        if (!abonelikler.length) return;
+        await Promise.all(abonelikler.map(async a => {
+            if (!a.endpoint) return;
+            const sub = { endpoint: a.endpoint, keys: { p256dh: a.p256dh, auth: a.auth } };
+            try {
+                await webpush.sendNotification(sub, JSON.stringify({ baslik, mesaj }));
+            } catch(e) {
+                if (e.statusCode === 410 || e.statusCode === 404) {
+                    await fsDelete('abonelikler', a._id);
+                } else {
+                    console.error('Bildirim hatası:', e.message);
+                }
+            }
+        }));
         console.log(`🔔 Bildirim: ${baslik}`);
     } catch(e) {
-        if (!e.message?.includes('410') && !e.message?.includes('404')) {
-            console.error('Bildirim hatası:', e.message);
-        }
+        console.error('bildirimGonder hatası:', e.message);
     }
 }
 
