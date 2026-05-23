@@ -444,7 +444,15 @@ async function yoklamaRaporuGonder() {
             siniflar[sinif].push(ogrenci);
         }
 
-        const tarihStr = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+        const tarihStr  = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+        const OTURUMLAR = ['İkindi', 'Akşam', 'Yatsı'];
+
+        function stSimge(st) {
+            if (st === 't' || st === 'p') return '✅';
+            if (st === 'l') return '⏰';
+            if (st === 'a') return '❌';
+            return '—';
+        }
 
         for (const [sinif, ogrenciler] of Object.entries(siniflar)) {
             const grupId = sinifGruplar[sinif];
@@ -452,29 +460,30 @@ async function yoklamaRaporuGonder() {
 
             ogrenciler.sort((a, b) => a.localeCompare(b, 'tr'));
             const satirlar = [];
-            let geldi = 0, gec = 0, gelmedi = 0, kayitYok = 0;
+
+            // Özet sayaçları: kaç kişi en az bir oturumda gelmedi
+            let tamGeldi = 0, enAzBirGelmedi = 0;
 
             for (const ogrenci of ogrenciler) {
                 const sessions = yoklamaData?.[ogrenci]?.sessions || {};
-                const stList   = Object.values(sessions).map(s => s?.st).filter(Boolean);
-                let durum = null;
-                if (stList.includes('t'))      durum = 't';
-                else if (stList.includes('p')) durum = 'p';
-                else if (stList.includes('l')) durum = 'l';
-                else if (stList.includes('a')) durum = 'a';
+                const oturumSimgeleri = OTURUMLAR.map(ot => {
+                    const st = sessions[ot]?.st;
+                    return `${ot}: ${stSimge(st)}`;
+                });
 
-                if (durum === 't' || durum === 'p') { satirlar.push(`✅ ${ogrenci}`); geldi++; }
-                else if (durum === 'l')              { satirlar.push(`⏰ ${ogrenci} (geç)`); gec++; }
-                else if (durum === 'a')              { satirlar.push(`❌ ${ogrenci}`); gelmedi++; }
-                else                                 { satirlar.push(`➖ ${ogrenci}`); kayitYok++; }
+                // Genel durum: en az birinde yoksa ❌ var mı?
+                const stListesi = OTURUMLAR.map(ot => sessions[ot]?.st);
+                const hepsiBos  = stListesi.every(s => !s);
+                const birindeGelmedi = stListesi.some(s => s === 'a');
+                if (!hepsiBos && !birindeGelmedi) tamGeldi++;
+                else if (birindeGelmedi) enAzBirGelmedi++;
+
+                satirlar.push(`*${ogrenci}*\n${oturumSimgeleri.join('  |  ')}`);
             }
 
-            const ozetParcalar = [`✅ ${geldi} geldi`];
-            if (gec > 0)       ozetParcalar.push(`⏰ ${gec} geç`);
-            ozetParcalar.push(`❌ ${gelmedi} gelmedi`);
-            if (kayitYok > 0)  ozetParcalar.push(`➖ ${kayitYok} kayıt yok`);
+            const ozet = `✅ ${tamGeldi} tam devam  |  ❌ ${enAzBirGelmedi} eksik`;
 
-            const mesaj = `📋 *${sinif} — Akşam Yoklaması*\n📅 ${tarihStr}\n\n${satirlar.join('\n')}\n\n${'─'.repeat(16)}\n${ozetParcalar.join('  |  ')}\nToplam: ${ogrenciler.length} öğrenci`;
+            const mesaj = `📋 *${sinif} — Günlük Yoklama*\n📅 ${tarihStr}\n\n${satirlar.join('\n\n')}\n\n${'─'.repeat(16)}\n${ozet}\nToplam: ${ogrenciler.length} öğrenci`;
 
             await sock.sendMessage(grupId, { text: mesaj });
             console.log(`  ✅ ${sinif} → ${geldi} geldi, ${gelmedi} gelmedi, ${kayitYok} kayıtsız`);
