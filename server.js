@@ -411,7 +411,7 @@ async function mavikentRtdb(path) {
     }
 }
 
-// ── Yoklama raporu (22:30 otomatik) ────────────────────────────
+// ── Okul dönüş raporu (17:00 otomatik) ────────────────────────
 let yoklamaGonderildiGun = '';
 
 async function yoklamaRaporuGonder() {
@@ -422,18 +422,18 @@ async function yoklamaRaporuGonder() {
         if (!Object.values(sinifGruplar).some(Boolean)) return;
 
         const todayStr = new Date().toDateString();
-        console.log(`📋 Yoklama raporu başlıyor — ${todayStr}`);
+        console.log(`🏫 Okul dönüş raporu başlıyor — ${todayStr}`);
 
-        const [rosterRaw, studentClasses, yoklamaData] = await Promise.all([
+        const [rosterRaw, studentClasses, dailyStatus] = await Promise.all([
             mavikentRtdb('roster'),
             mavikentRtdb('student_classes'),
-            mavikentRtdb(`yoklama_d/${todayStr}`)
+            mavikentRtdb(`daily_status/${todayStr}`)
         ]);
 
         const roster = Array.isArray(rosterRaw)
             ? rosterRaw.filter(Boolean)
             : Object.values(rosterRaw || {}).filter(Boolean);
-        if (!roster.length) { console.log('Yoklama: roster boş'); return; }
+        if (!roster.length) { console.log('Okul dönüş: roster boş'); return; }
 
         // Sınıflara göre grupla
         const siniflar = {};
@@ -444,15 +444,7 @@ async function yoklamaRaporuGonder() {
             siniflar[sinif].push(ogrenci);
         }
 
-        const tarihStr  = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-        const OTURUMLAR = ['İkindi', 'Akşam', 'Yatsı'];
-
-        function stSimge(st) {
-            if (st === 't' || st === 'p') return '✅';
-            if (st === 'l') return '⏰';
-            if (st === 'a') return '❌';
-            return '—';
-        }
+        const tarihStr = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
 
         for (const [sinif, ogrenciler] of Object.entries(siniflar)) {
             const grupId = sinifGruplar[sinif];
@@ -460,30 +452,21 @@ async function yoklamaRaporuGonder() {
 
             ogrenciler.sort((a, b) => a.localeCompare(b, 'tr'));
             const satirlar = [];
-
-            // Özet sayaçları: kaç kişi en az bir oturumda gelmedi
-            let tamGeldi = 0, enAzBirGelmedi = 0;
+            let dondu = 0, gelmedi = 0, izinli = 0, kayitsiz = 0;
 
             for (const ogrenci of ogrenciler) {
-                const sessions = yoklamaData?.[ogrenci]?.sessions || {};
-                const oturumSimgeleri = OTURUMLAR.map(ot => {
-                    const st = sessions[ot]?.st;
-                    return `${ot}: ${stSimge(st)}`;
-                });
-
-                // Genel durum: en az birinde yoksa ❌ var mı?
-                const stListesi = OTURUMLAR.map(ot => sessions[ot]?.st);
-                const hepsiBos  = stListesi.every(s => !s);
-                const birindeGelmedi = stListesi.some(s => s === 'a');
-                if (!hepsiBos && !birindeGelmedi) tamGeldi++;
-                else if (birindeGelmedi) enAzBirGelmedi++;
-
-                satirlar.push(`*${ogrenci}*\n${oturumSimgeleri.join('  |  ')}`);
+                const st = dailyStatus?.[ogrenci];
+                if (st === 'p')      { satirlar.push(`✅ ${ogrenci}`); dondu++; }
+                else if (st === 'a') { satirlar.push(`❌ ${ogrenci}`); gelmedi++; }
+                else if (st === 'i') { satirlar.push(`🏖️ ${ogrenci} (izinli)`); izinli++; }
+                else                 { satirlar.push(`➖ ${ogrenci}`); kayitsiz++; }
             }
 
-            const ozet = `✅ ${tamGeldi} tam devam  |  ❌ ${enAzBirGelmedi} eksik`;
+            const ozetParcalar = [`✅ ${dondu} döndü`, `❌ ${gelmedi} gelmedi`];
+            if (izinli  > 0) ozetParcalar.push(`🏖️ ${izinli} izinli`);
+            if (kayitsiz > 0) ozetParcalar.push(`➖ ${kayitsiz} kayıtsız`);
 
-            const mesaj = `📋 *${sinif} — Günlük Yoklama*\n📅 ${tarihStr}\n\n${satirlar.join('\n\n')}\n\n${'─'.repeat(16)}\n${ozet}\nToplam: ${ogrenciler.length} öğrenci`;
+            const mesaj = `🏫 *${sinif} — Okul Dönüş*\n📅 ${tarihStr}\n\n${satirlar.join('\n')}\n\n${'─'.repeat(16)}\n${ozetParcalar.join('  |  ')}\nToplam: ${ogrenciler.length} öğrenci`;
 
             await sock.sendMessage(grupId, { text: mesaj });
             console.log(`  ✅ ${sinif} → ${geldi} geldi, ${gelmedi} gelmedi, ${kayitYok} kayıtsız`);
@@ -491,7 +474,7 @@ async function yoklamaRaporuGonder() {
         }
 
         const sinifSayisi = Object.keys(siniflar).length;
-        bildirimGonder('📋 Yoklama Gönderildi', `${sinifSayisi} sınıfın akşam yoklaması velilere iletildi.`).catch(() => {});
+        bildirimGonder('🏫 Okul Dönüş Gönderildi', `${sinifSayisi} sınıfın okul dönüş yoklaması velilere iletildi.`).catch(() => {});
     } catch(e) {
         console.error('Yoklama raporu hatası:', e.message);
         bildirimGonder('❌ Yoklama Hatası', e.message).catch(() => {});
@@ -506,9 +489,9 @@ setInterval(() => {
     const sa     = simdi.getHours();
     const dk     = simdi.getMinutes();
 
-    if (sa === 22 && dk === 30 && yoklamaGonderildiGun !== bugun) {
+    if (sa === 17 && dk === 0 && yoklamaGonderildiGun !== bugun) {
         yoklamaGonderildiGun = bugun;
-        yoklamaRaporuGonder().catch(e => console.error('Yoklama tetikleme hatası:', e.message));
+        yoklamaRaporuGonder().catch(e => console.error('Okul dönüş tetikleme hatası:', e.message));
     }
 
     if (sa === 23 && dk < 1 && ozetGonderildiGun !== bugun) {
