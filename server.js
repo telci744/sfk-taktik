@@ -368,13 +368,124 @@ async function zamanlıGonderimKontrol() {
 
 setInterval(zamanlıGonderimKontrol, 30000);
 
-// ── 23:00 Günlük özet ─────────────────────────────────────────
+// ── Mavikent v2 Realtime DB ────────────────────────────────────
+const MAVIKENT_APIKEY = 'AIzaSyDb2IuKMeXHNvhqL8GLiaY_4GYF60dv81A';
+const MAVIKENT_RTDB   = 'https://mavikent-aa820-default-rtdb.firebaseio.com';
+let _mavikentToken    = null;
+let _mavikentTokenExp = 0;
+
+async function mavikentAnon() {
+    if (_mavikentToken && Date.now() < _mavikentTokenExp) return _mavikentToken;
+    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInAnonymously?key=${MAVIKENT_APIKEY}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ returnSecureToken: true })
+    });
+    const d = await r.json();
+    if (!d.idToken) throw new Error('Mavikent anonim giriş başarısız: ' + JSON.stringify(d));
+    _mavikentToken    = d.idToken;
+    _mavikentTokenExp = Date.now() + (Number(d.expiresIn) - 120) * 1000;
+    return _mavikentToken;
+}
+
+async function mavikentRtdb(path) {
+    const token       = await mavikentAnon();
+    const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+    const r = await fetch(`${MAVIKENT_RTDB}/mavikent_premium/${encodedPath}.json?auth=${token}`);
+    if (!r.ok) throw new Error(`Mavikent RTDB ${r.status}: ${await r.text()}`);
+    return r.json();
+}
+
+// ── Yoklama raporu (22:30 otomatik) ────────────────────────────
+let yoklamaGonderildiGun = '';
+
+async function yoklamaRaporuGonder() {
+    try {
+        const ayarlar = await fsGet('yoklama_ayarlari', 'ayarlar').catch(() => null);
+        if (!ayarlar?.aktif) return;
+        const sinifGruplar = ayarlar.siniflar || {};
+        if (!Object.values(sinifGruplar).some(Boolean)) return;
+
+        const todayStr = new Date().toDateString();
+        console.log(`📋 Yoklama raporu başlıyor — ${todayStr}`);
+
+        const [rosterRaw, studentClasses, yoklamaData] = await Promise.all([
+            mavikentRtdb('roster'),
+            mavikentRtdb('student_classes'),
+            mavikentRtdb(`yoklama_d/${todayStr}`)
+        ]);
+
+        const roster = Array.isArray(rosterRaw)
+            ? rosterRaw.filter(Boolean)
+            : Object.values(rosterRaw || {}).filter(Boolean);
+        if (!roster.length) { console.log('Yoklama: roster boş'); return; }
+
+        // Sınıflara göre grupla
+        const siniflar = {};
+        for (const ogrenci of roster) {
+            const sinif = studentClasses?.[ogrenci];
+            if (!sinif || !sinifGruplar[sinif]) continue;
+            if (!siniflar[sinif]) siniflar[sinif] = [];
+            siniflar[sinif].push(ogrenci);
+        }
+
+        const tarihStr = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+        for (const [sinif, ogrenciler] of Object.entries(siniflar)) {
+            const grupId = sinifGruplar[sinif];
+            if (!grupId || !hazir) continue;
+
+            ogrenciler.sort((a, b) => a.localeCompare(b, 'tr'));
+            const satirlar = [];
+            let geldi = 0, gec = 0, gelmedi = 0, kayitYok = 0;
+
+            for (const ogrenci of ogrenciler) {
+                const sessions = yoklamaData?.[ogrenci]?.sessions || {};
+                const stList   = Object.values(sessions).map(s => s?.st).filter(Boolean);
+                let durum = null;
+                if (stList.includes('t'))      durum = 't';
+                else if (stList.includes('p')) durum = 'p';
+                else if (stList.includes('l')) durum = 'l';
+                else if (stList.includes('a')) durum = 'a';
+
+                if (durum === 't' || durum === 'p') { satirlar.push(`✅ ${ogrenci}`); geldi++; }
+                else if (durum === 'l')              { satirlar.push(`⏰ ${ogrenci} (geç)`); gec++; }
+                else if (durum === 'a')              { satirlar.push(`❌ ${ogrenci}`); gelmedi++; }
+                else                                 { satirlar.push(`➖ ${ogrenci}`); kayitYok++; }
+            }
+
+            const ozetParcalar = [`✅ ${geldi} geldi`];
+            if (gec > 0)       ozetParcalar.push(`⏰ ${gec} geç`);
+            ozetParcalar.push(`❌ ${gelmedi} gelmedi`);
+            if (kayitYok > 0)  ozetParcalar.push(`➖ ${kayitYok} kayıt yok`);
+
+            const mesaj = `📋 *${sinif} — Akşam Yoklaması*\n📅 ${tarihStr}\n\n${satirlar.join('\n')}\n\n${'─'.repeat(16)}\n${ozetParcalar.join('  |  ')}\nToplam: ${ogrenciler.length} öğrenci`;
+
+            await sock.sendMessage(grupId, { text: mesaj });
+            console.log(`  ✅ ${sinif} → ${geldi} geldi, ${gelmedi} gelmedi, ${kayitYok} kayıtsız`);
+            if (ogrenciler !== Object.values(siniflar).at(-1)) await new Promise(r => setTimeout(r, 3000));
+        }
+
+        const sinifSayisi = Object.keys(siniflar).length;
+        bildirimGonder('📋 Yoklama Gönderildi', `${sinifSayisi} sınıfın akşam yoklaması velilere iletildi.`).catch(() => {});
+    } catch(e) {
+        console.error('Yoklama raporu hatası:', e.message);
+        bildirimGonder('❌ Yoklama Hatası', e.message).catch(() => {});
+    }
+}
+
+// ── 23:00 Günlük özet & 22:30 Yoklama ────────────────────────
 let ozetGonderildiGun = '';
 setInterval(() => {
     const simdi  = new Date();
     const bugun  = simdi.toISOString().split('T')[0];
     const sa     = simdi.getHours();
     const dk     = simdi.getMinutes();
+
+    if (sa === 22 && dk === 30 && yoklamaGonderildiGun !== bugun) {
+        yoklamaGonderildiGun = bugun;
+        yoklamaRaporuGonder().catch(e => console.error('Yoklama tetikleme hatası:', e.message));
+    }
+
     if (sa === 23 && dk < 1 && ozetGonderildiGun !== bugun) {
         ozetGonderildiGun = bugun;
         const { gonderilenler, hatalar } = gunStats;

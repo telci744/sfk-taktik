@@ -975,7 +975,7 @@
     <div class="modal">
         <div class="modal-tutac"></div>
         <div class="modal-baslik">
-            <h2>Bilgi</h2>
+            <h2>Ayarlar</h2>
             <button class="btn-kapat-modal" onclick="modalKapat('ayarOverlay')">✕</button>
         </div>
         <div style="background:#f2f2f7;border-radius:12px;padding:16px;font-size:14px;line-height:1.8;margin-bottom:16px;">
@@ -986,6 +986,26 @@
             📱 Telefon: <code style="background:#f2f2f7;padding:2px 6px;border-radius:4px;">http://100.111.136.11:3001</code><br>
             💻 Bilgisayar: <code style="background:#f2f2f7;padding:2px 6px;border-radius:4px;">http://localhost:3001</code><br><br>
             Tailscale açık olmalı.
+        </div>
+
+        <!-- ── Yoklama Raporu Ayarları ── -->
+        <div style="margin-top:16px;border-top:1.5px solid #e5e5ea;padding-top:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <div>
+                    <div style="font-weight:700;font-size:14px;">📋 Yoklama Raporu</div>
+                    <div style="font-size:11px;color:#8e8e93;margin-top:2px;">Her gün 22:30'da veli gruplarına otomatik gönderilir</div>
+                </div>
+                <label class="toggle-sw">
+                    <input type="checkbox" id="yoklamaAktif" onchange="yoklamaToggle()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div id="yoklamaSinifBolumu" style="display:none;margin-top:14px;">
+                <div style="font-size:12px;color:#8e8e93;margin-bottom:10px;">Her sınıf için WhatsApp grubunu seç:</div>
+                <div id="yoklamaSinifListesi"></div>
+                <button onclick="yoklamaAyarKaydet()" style="margin-top:12px;width:100%;padding:12px;background:#007aff;color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">Kaydet</button>
+                <div id="yoklamaKayitDurum" style="font-size:12px;text-align:center;margin-top:8px;min-height:18px;"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -1851,10 +1871,67 @@
         }).catch(() => {
             durum.innerHTML = '<span style="color:#ff3b30;font-weight:700;">❌ Firebase bağlantı hatası</span>';
         });
+        yoklamaAyarYukle();
     }
 
     function ayarKaydet() {
         modalKapat('ayarOverlay');
+    }
+
+    // ── Yoklama Raporu Ayarları ───────────────────────────────
+    const YOKLAMA_SINIFLAR = ['5. Sınıf', '6. Sınıf', '7. Sınıf', '8. Sınıf', 'ELİT', 'STANDART'];
+
+    async function yoklamaAyarYukle() {
+        try {
+            const [yokSnap, grupSnap] = await Promise.all([
+                db.collection('yoklama_ayarlari').doc('ayarlar').get(),
+                db.collection('gruplar').doc('liste').get()
+            ]);
+            const veri    = yokSnap.exists ? (yokSnap.data() || {}) : {};
+            const gruplar = grupSnap.exists ? (grupSnap.data()?.items || []) : [];
+
+            document.getElementById('yoklamaAktif').checked = !!veri.aktif;
+            document.getElementById('yoklamaSinifBolumu').style.display = veri.aktif ? 'block' : 'none';
+
+            const sinifGruplar = veri.siniflar || {};
+            const listesi = document.getElementById('yoklamaSinifListesi');
+            listesi.innerHTML = YOKLAMA_SINIFLAR.map(sinif => `
+                <div style="margin-bottom:10px;">
+                    <div style="font-size:12px;font-weight:700;color:#1c1c1e;margin-bottom:4px;">${sinif}</div>
+                    <select data-sinif="${sinif}" style="width:100%;padding:9px 10px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:13px;background:white;color:#1c1c1e;">
+                        <option value="">— Grup seç —</option>
+                        ${gruplar.map(g => `<option value="${g.id}" ${sinifGruplar[sinif] === g.id ? 'selected' : ''}>${g.ad}</option>`).join('')}
+                    </select>
+                </div>
+            `).join('');
+        } catch(e) {
+            console.error('Yoklama ayar yükleme:', e);
+        }
+    }
+
+    function yoklamaToggle() {
+        const aktif = document.getElementById('yoklamaAktif').checked;
+        document.getElementById('yoklamaSinifBolumu').style.display = aktif ? 'block' : 'none';
+    }
+
+    async function yoklamaAyarKaydet() {
+        const aktif     = document.getElementById('yoklamaAktif').checked;
+        const siniflar  = {};
+        document.querySelectorAll('#yoklamaSinifListesi select').forEach(sel => {
+            if (sel.value) siniflar[sel.dataset.sinif] = sel.value;
+        });
+        const durum = document.getElementById('yoklamaKayitDurum');
+        durum.style.color = '#8e8e93';
+        durum.textContent = 'Kaydediliyor...';
+        try {
+            await db.collection('yoklama_ayarlari').doc('ayarlar').set({ aktif, siniflar });
+            durum.style.color = '#34c759';
+            durum.textContent = '✅ Kaydedildi';
+            setTimeout(() => { durum.textContent = ''; }, 2000);
+        } catch(e) {
+            durum.style.color = '#ff3b30';
+            durum.textContent = '❌ ' + e.message;
+        }
     }
 
     // ── Modal Yönetimi ────────────────────────────────────────
