@@ -712,6 +712,64 @@
             border: 1.5px solid #007aff; margin-top: 8px;
         }
 
+        /* ── Dashboard Panelleri ── */
+        .panel-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            padding: 16px 16px 32px;
+        }
+        .panel {
+            background: white;
+            border-radius: 22px;
+            padding: 20px;
+            min-height: 136px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 2px 14px rgba(0,0,0,.07);
+            cursor: pointer;
+            transition: transform .14s, box-shadow .14s;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .panel:active { transform: scale(.96); box-shadow: 0 1px 5px rgba(0,0,0,.09); }
+        .panel-icon {
+            width: 46px; height: 46px;
+            border-radius: 13px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+        }
+        .panel-title { font-size: 14px; font-weight: 800; color: #1c1c1e; margin-top: 14px; }
+        .panel-sub   { font-size: 12px; color: #8e8e93; margin-top: 3px; line-height: 1.4; }
+
+        /* Mesaj Gönder — tam genişlik, koyu */
+        .panel-primary {
+            grid-column: 1 / -1;
+            min-height: 96px;
+            flex-direction: row;
+            align-items: center;
+            gap: 18px;
+            background: #0a2d6e;
+            padding: 22px 24px;
+        }
+        .panel-primary .panel-icon { background: rgba(255,255,255,.15); font-size: 24px; flex-shrink: 0; }
+        .panel-primary .panel-title { color: white; font-size: 17px; margin-top: 0; }
+        .panel-primary .panel-sub   { color: rgba(255,255,255,.6); }
+
+        /* Mesajlar alt sayfa başlığı */
+        .mesajlar-sub-header {
+            display: flex; align-items: center;
+            gap: 10px; padding: 12px 16px 0;
+        }
+        .geri-btn {
+            background: #f2f2f7; border: none;
+            border-radius: 10px; padding: 7px 14px;
+            font-size: 14px; font-weight: 700;
+            cursor: pointer; color: #007aff; white-space: nowrap;
+        }
+        .mesajlar-sub-baslik { flex: 1; font-size: 17px; font-weight: 800; color: #1c1c1e; }
+
         .qr-setup-alan {
             background: white; border-radius: 16px;
             padding: 20px; text-align: center;
@@ -809,26 +867,60 @@
         <span id="wpBarMetin">WhatsApp bağlanıyor... (sunucuyu başlattınız mı?)</span>
     </div>
 
-    <!-- Header -->
-    <div class="header">
+    <!-- Dashboard Header -->
+    <div class="header" id="dashboardHeader">
         <div class="header-top">
             <h1>Bilgi İşlem</h1>
-            <div style="display:flex;align-items:center;gap:8px;">
-                <span class="header-sayac" id="sayac">0 öğe</span>
-                <button onclick="ayarModalAc()" style="background:#f2f2f7;border:none;width:32px;height:32px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">⚙️</button>
+            <button onclick="ayarModalAc()" style="background:#f2f2f7;border:none;width:32px;height:32px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">⚙️</button>
+        </div>
+    </div>
+
+    <!-- Ana Panel Grid -->
+    <div class="panel-grid" id="panelGrid">
+        <!-- Mesaj Gönder -->
+        <div class="panel panel-primary" onclick="modalAc()">
+            <div class="panel-icon">📨</div>
+            <div>
+                <div class="panel-title">Mesaj Gönder</div>
+                <div class="panel-sub">WhatsApp gruplarına ilet</div>
             </div>
         </div>
-        <div class="filtreler">
+
+        <!-- Gönderilen Mesajlar -->
+        <div class="panel" onclick="listeGoster()">
+            <div class="panel-icon" style="background:#eff6ff;">📋</div>
+            <div>
+                <div class="panel-title">Mesajlar</div>
+                <div class="panel-sub" id="panelMesajSayisi">Yükleniyor...</div>
+            </div>
+        </div>
+
+        <!-- Veli Bilgilendirme -->
+        <div class="panel" onclick="veliModalAc()">
+            <div class="panel-icon" style="background:#fff7ed;">🏫</div>
+            <div>
+                <div class="panel-title">Veli Bilgilendirme</div>
+                <div class="panel-sub" id="panelVeliDurum">Okul dönüş 17:00</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mesajlar Alt Sayfası -->
+    <div id="mesajlarSayfa" style="display:none;">
+        <div class="mesajlar-sub-header">
+            <button class="geri-btn" onclick="dashboardGoster()">‹ Geri</button>
+            <span class="mesajlar-sub-baslik">Mesajlar</span>
+            <span class="header-sayac" id="sayac">0 öğe</span>
+        </div>
+        <div class="filtreler" style="padding:10px 16px 8px;">
             <button class="filtre-btn aktif" data-filtre="tumu"       onclick="filtreSecCli(this)">Tümü</button>
             <button class="filtre-btn"       data-filtre="bekleyen"   onclick="filtreSecCli(this)">Bekleyen</button>
             <button class="filtre-btn"       data-filtre="tamamlandi" onclick="filtreSecCli(this)">Tamamlanan</button>
         </div>
+        <div class="liste" id="liste"></div>
+        <button class="fab" onclick="modalAc()">+</button>
     </div>
-
-    <div class="liste" id="liste"></div>
 </div>
-
-<button class="fab" onclick="modalAc()">+</button>
 
 <!-- ── Yeni Anımsatıcı Modal ── -->
 <div class="overlay" id="overlay" onclick="overlayTikla(event, 'overlay')">
@@ -988,27 +1080,38 @@
             Tailscale açık olmalı.
         </div>
 
-        <!-- ── Yoklama Raporu Ayarları ── -->
-        <div style="margin-top:16px;border-top:1.5px solid #e5e5ea;padding-top:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                <div>
-                    <div style="font-weight:700;font-size:14px;">🏫 Okul Dönüş Raporu</div>
-                    <div style="font-size:11px;color:#8e8e93;margin-top:2px;">Her gün 17:00'da okul dönüş yoklaması veli gruplarına gönderilir</div>
-                </div>
-                <label class="toggle-sw">
-                    <input type="checkbox" id="yoklamaAktif" onchange="yoklamaToggle()">
-                    <span class="toggle-slider"></span>
-                </label>
+    </div>
+</div>
+
+<!-- ── Veli Bilgilendirme Modal ── -->
+<div class="overlay" id="veliOverlay" onclick="overlayTikla(event, 'veliOverlay')">
+    <div class="modal">
+        <div class="modal-tutac"></div>
+        <div class="modal-baslik">
+            <h2>🏫 Veli Bilgilendirme</h2>
+            <button class="btn-kapat-modal" onclick="modalKapat('veliOverlay')">✕</button>
+        </div>
+        <div style="background:#fff7ed;border-radius:12px;padding:14px 16px;font-size:13px;color:#92400e;margin-bottom:16px;line-height:1.6;">
+            Her gün <b>17:00</b>'da Mavikent v2'den okul dönüş verileri çekilir ve seçili veli gruplarına sınıf bazlı gönderilir.
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div>
+                <div style="font-weight:700;font-size:14px;">Otomatik Gönderim</div>
+                <div style="font-size:11px;color:#8e8e93;margin-top:2px;">Aktif olduğunda her gün çalışır</div>
             </div>
-            <div id="yoklamaSinifBolumu" style="display:none;margin-top:14px;">
-                <div style="font-size:12px;color:#8e8e93;margin-bottom:10px;">Her sınıf için WhatsApp grubunu seç:</div>
-                <div id="yoklamaSinifListesi"></div>
-                <div style="display:flex;gap:8px;margin-top:12px;">
-                    <button onclick="yoklamaAyarKaydet()" style="flex:1;padding:12px;background:#007aff;color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">Kaydet</button>
-                    <button onclick="yoklamaSimdiGonder()" style="padding:12px 16px;background:#f2f2f7;color:#1c1c1e;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;" title="Şimdi test gönderimi yap">▶ Test</button>
-                </div>
-                <div id="yoklamaKayitDurum" style="font-size:12px;text-align:center;margin-top:8px;min-height:18px;"></div>
+            <label class="toggle-sw">
+                <input type="checkbox" id="yoklamaAktif" onchange="yoklamaToggle()">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div id="yoklamaSinifBolumu" style="display:none;margin-top:16px;">
+            <div style="font-size:12px;color:#8e8e93;margin-bottom:10px;">Her sınıf için WhatsApp veli grubunu seç:</div>
+            <div id="yoklamaSinifListesi"></div>
+            <div style="display:flex;gap:8px;margin-top:14px;">
+                <button onclick="yoklamaAyarKaydet()" style="flex:1;padding:12px;background:#007aff;color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">Kaydet</button>
+                <button onclick="yoklamaSimdiGonder()" style="padding:12px 16px;background:#f2f2f7;color:#1c1c1e;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;" title="Şimdi test gönderimi yap">▶ Test</button>
             </div>
+            <div id="yoklamaKayitDurum" style="font-size:12px;text-align:center;margin-top:8px;min-height:18px;"></div>
         </div>
     </div>
 </div>
@@ -1205,6 +1308,12 @@
     function kilitAc() {
         sessionStorage.setItem('mavikonak_giris', '1');
         document.getElementById('kilitEkran').style.display = 'none';
+        // Veli panel durumunu yükle
+        db.collection('yoklama_ayarlari').doc('ayarlar').get().then(snap => {
+            const v = snap.exists ? snap.data() : {};
+            const el = document.getElementById('panelVeliDurum');
+            if (el) el.textContent = v.aktif ? '✅ Aktif — her gün 17:00' : 'Okul dönüş 17:00';
+        }).catch(() => {});
     }
 
     async function kilitBtnTikla() {
@@ -1331,6 +1440,13 @@
     db.collection("animsaticilar").orderBy("olusturulma", "desc").onSnapshot(snap => {
         tumVeri = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         listeyiGuncelle();
+        // Panel sayacını güncelle
+        const bekleyen   = tumVeri.filter(x => !x.tamamlandi).length;
+        const tamamlandi = tumVeri.filter(x => x.tamamlandi).length;
+        const panelSub   = document.getElementById('panelMesajSayisi');
+        if (panelSub) panelSub.textContent = tumVeri.length === 0
+            ? 'Henüz mesaj yok'
+            : `${bekleyen} bekleyen  ·  ${tamamlandi} tamamlandı`;
     });
 
     // WhatsApp durumu — Firestore gerçek zamanlı (HTTP yok, mixed content yok)
@@ -1345,20 +1461,25 @@
     function wpBarGuncelle(hazir, qr, sunucuYok = false) {
         const bar   = document.getElementById('wpBar');
         const metin = document.getElementById('wpBarMetin');
+        const panelWa = document.getElementById('panelWaDurum');
         if (sunucuYok) {
             bar.className = 'wp-bar';
             metin.textContent = '⚠️ Sunucu kapalı — terminalde "node server.js" çalıştırın';
+            if (panelWa) panelWa.textContent = '⚠️ Sunucu kapalı';
             return;
         }
         if (hazir) {
             bar.className = 'wp-bar bagli';
             metin.textContent = 'WhatsApp Bağlı ✓';
+            if (panelWa) panelWa.textContent = '✅ WhatsApp bağlı';
         } else if (qr) {
             bar.className = 'wp-bar';
             metin.textContent = '📱 QR kodu okutmak için buraya dokunun';
+            if (panelWa) panelWa.textContent = '📱 QR bekleniyor';
         } else {
             bar.className = 'wp-bar';
             metin.textContent = 'WhatsApp bağlanıyor...';
+            if (panelWa) panelWa.textContent = 'WhatsApp bağlanıyor...';
         }
     }
 
@@ -1857,6 +1978,30 @@
         }
     }
 
+    // ── Dashboard Navigasyon ──────────────────────────────────
+    function listeGoster() {
+        document.getElementById('dashboardHeader').style.display = 'none';
+        document.getElementById('panelGrid').style.display       = 'none';
+        document.getElementById('mesajlarSayfa').style.display   = 'block';
+    }
+
+    function dashboardGoster() {
+        document.getElementById('dashboardHeader').style.display = 'block';
+        document.getElementById('panelGrid').style.display       = 'grid';
+        document.getElementById('mesajlarSayfa').style.display   = 'none';
+    }
+
+    function veliModalAc() {
+        modalAcGoster('veliOverlay');
+        yoklamaAyarYukle();
+        // Panel alt yazısını güncelle
+        db.collection('yoklama_ayarlari').doc('ayarlar').get().then(snap => {
+            const v = snap.exists ? snap.data() : {};
+            document.getElementById('panelVeliDurum').textContent =
+                v.aktif ? '✅ Aktif — her gün 17:00' : 'Okul dönüş 17:00';
+        }).catch(() => {});
+    }
+
     // ── Ayarlar ───────────────────────────────────────────────
     function ayarModalAc() {
         modalAcGoster('ayarOverlay');
@@ -1874,7 +2019,6 @@
         }).catch(() => {
             durum.innerHTML = '<span style="color:#ff3b30;font-weight:700;">❌ Firebase bağlantı hatası</span>';
         });
-        yoklamaAyarYukle();
     }
 
     function ayarKaydet() {
@@ -1946,6 +2090,8 @@
             durum.style.color = '#34c759';
             durum.textContent = '✅ Kaydedildi';
             setTimeout(() => { durum.textContent = ''; }, 2000);
+            const el = document.getElementById('panelVeliDurum');
+            if (el) el.textContent = aktif ? '✅ Aktif — her gün 17:00' : 'Okul dönüş 17:00';
         } catch(e) {
             durum.style.color = '#ff3b30';
             durum.textContent = '❌ ' + e.message;
