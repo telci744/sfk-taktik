@@ -1483,6 +1483,12 @@
         logoYukle().catch(() => {});
     };
 
+    function localIso(d) {
+        return d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+    }
+
     // ── Sabitler & Durum ──────────────────────────────────────
     let tumVeri           = [];
     let aktifFiltre       = "tumu";
@@ -1499,7 +1505,7 @@
 
     // ── Başlangıç ────────────────────────────────────────────
     const bugun = new Date();
-    document.getElementById("inputTarih").value = bugun.toISOString().split("T")[0];
+    document.getElementById("inputTarih").value = localIso(bugun);
 
     // Anımsatıcılar — gerçek zamanlı
     db.collection("animsaticilar").orderBy("olusturulma", "desc").onSnapshot(snap => {
@@ -1611,7 +1617,7 @@
 
         liste.innerHTML = filtreli.map(item => {
             const tamam     = item.tamamlandi;
-            const gecmisMi  = !tamam && item.tarih && item.tarih < bugun.toISOString().split("T")[0];
+            const gecmisMi  = !tamam && item.tarih && item.tarih < localIso(bugun);
             const tarihMetni = item.tarih
                 ? tarihFormatla(item.tarih) + (item.saat ? " " + item.saat : "")
                 : "";
@@ -1645,9 +1651,9 @@
 
     // ── Yardımcılar ───────────────────────────────────────────
     function tarihFormatla(iso) {
-        const bugunStr = bugun.toISOString().split("T")[0];
+        const bugunStr = localIso(bugun);
         const yarin = new Date(bugun); yarin.setDate(yarin.getDate() + 1);
-        const yarinStr = yarin.toISOString().split("T")[0];
+        const yarinStr = localIso(yarin);
         if (iso === bugunStr) return "Bugün";
         if (iso === yarinStr) return "Yarın";
         const [y, m, d] = iso.split("-");
@@ -1861,7 +1867,7 @@
             document.getElementById("inputBaslik").value = "";
             document.getElementById("inputMesaj").value  = "";
             document.getElementById("inputSaat").value   = "";
-            document.getElementById("inputTarih").value  = bugun.toISOString().split("T")[0];
+            document.getElementById("inputTarih").value  = localIso(bugun);
             document.getElementById("otomatikToggle").checked = false;
             document.getElementById("otomatikGrupBolum").style.display = "none";
             otGruplar = [];
@@ -2189,7 +2195,7 @@
         const grid = document.getElementById('takvimGrid');
         if (!grid) return;
         const gunler    = getHaftaGunleri(haftaOffset);
-        const bugunIso  = new Date().toISOString().split('T')[0];
+        const bugunIso  = localIso(new Date());
         const gunAdlari = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
         const ilk = gunler[0], son = gunler[6];
         let ayYil;
@@ -2203,7 +2209,7 @@
         if (ayYilEl) ayYilEl.textContent = ayYil;
 
         grid.innerHTML = gunler.map((g, i) => {
-            const iso      = g.toISOString().split('T')[0];
+            const iso      = localIso(g);
             const bugunMu  = iso === bugunIso;
             const seciliMu = iso === secilenGun;
             const bekleyen = tumVeri.filter(x => x.tarih === iso && !x.tamamlandi).length;
