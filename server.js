@@ -246,6 +246,15 @@ let isleniyor = false;
 async function isKontrol() {
     if (!hazir || isleniyor) return;
 
+    // Manuel yoklama tetikleme kontrolü
+    try {
+        const tetikle = await fsGet('yoklama_ayarlari', 'tetikle').catch(() => null);
+        if (tetikle?.istek) {
+            await fsUpdate('yoklama_ayarlari', 'tetikle', { istek: false });
+            yoklamaRaporuGonder().catch(e => console.error('Manuel yoklama hatası:', e.message));
+        }
+    } catch { /* yoksay */ }
+
     let isler;
     try {
         isler = await fsQuery('isler', 'durum', 'EQUAL', 'bekliyor');

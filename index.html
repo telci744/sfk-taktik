@@ -1003,7 +1003,10 @@
             <div id="yoklamaSinifBolumu" style="display:none;margin-top:14px;">
                 <div style="font-size:12px;color:#8e8e93;margin-bottom:10px;">Her sınıf için WhatsApp grubunu seç:</div>
                 <div id="yoklamaSinifListesi"></div>
-                <button onclick="yoklamaAyarKaydet()" style="margin-top:12px;width:100%;padding:12px;background:#007aff;color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">Kaydet</button>
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                    <button onclick="yoklamaAyarKaydet()" style="flex:1;padding:12px;background:#007aff;color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">Kaydet</button>
+                    <button onclick="yoklamaSimdiGonder()" style="padding:12px 16px;background:#f2f2f7;color:#1c1c1e;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;" title="Şimdi test gönderimi yap">▶ Test</button>
+                </div>
                 <div id="yoklamaKayitDurum" style="font-size:12px;text-align:center;margin-top:8px;min-height:18px;"></div>
             </div>
         </div>
@@ -1912,6 +1915,21 @@
     function yoklamaToggle() {
         const aktif = document.getElementById('yoklamaAktif').checked;
         document.getElementById('yoklamaSinifBolumu').style.display = aktif ? 'block' : 'none';
+    }
+
+    async function yoklamaSimdiGonder() {
+        const durum = document.getElementById('yoklamaKayitDurum');
+        durum.style.color = '#8e8e93';
+        durum.textContent = 'Tetikleniyor...';
+        try {
+            await db.collection('yoklama_ayarlari').doc('tetikle').set({ istek: true, ts: Date.now() });
+            durum.style.color = '#ff9500';
+            durum.textContent = '⏳ Sunucu işliyor (~30 sn)...';
+            setTimeout(() => { durum.textContent = ''; }, 35000);
+        } catch(e) {
+            durum.style.color = '#ff3b30';
+            durum.textContent = '❌ ' + e.message;
+        }
     }
 
     async function yoklamaAyarKaydet() {
